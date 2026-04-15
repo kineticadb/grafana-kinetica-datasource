@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "Kinetica",
+  "id": "kinetica-datasource",
+  "metrics": true,
+  "alerting": true,
+  "backend": true,
+  "executable": "gpx_kinetica_datasource",
+  "info": {
+    "description": "Connect Grafana to Kinetica for real-time analytics on large-scale data. Supports visual query builder, raw SQL, time series, and Grafana alerting.",
+    "author": {
+      "name": "Kinetica",
+      "url": "https://www.kinetica.com"
+    },
+    "keywords": [
+      "datasource",
+      "kinetica",
+      "sql",
+      "database",
+      "analytics",
+      "timeseries",
+      "gpu",
+      "real-time",
+      "query-builder"
+    ],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "Documentation",
+        "url": "https://docs.kinetica.com"
+      },
+      {
+        "name": "Website",
+        "url": "https://www.kinetica.com"
+      }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.4.0",
+    "plugins": []
+  }
+}

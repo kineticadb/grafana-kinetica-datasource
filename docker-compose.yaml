@@ -1,0 +1,34 @@
+version: '3.7'
+
+services:
+  grafana:
+    container_name: kinetica-grafana-dev
+    extends:
+      file: .config/docker-compose-base.yaml
+      service: grafana
+    ports:
+      - "3001:3000"
+      - "2345:2345"
+    
+    environment:
+      - GF_LOG_LEVEL=error
+      - GF_LOG_FILTERS=plugin.kinetica-datasource:debug
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-datasource
+
+    # 1. Load the .env file
+    env_file:
+      - .env
+
+    # ----------------------------------------------------------------
+    # NETWORK STRATEGY: Host Gateway
+    # Since Kinetica is on the default 'bridge' network, we cannot use 
+    # DNS resolution by container name. 
+    # Instead, we map 'host.docker.internal' to your Host IP.
+    # ----------------------------------------------------------------
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    volumes:
+      - ./:/var/lib/grafana/plugins/kinetica-datasource
+      # This line maps your local 'provisioning' folder to the container's config location
+      - ./provisioning:/etc/grafana/provisioning

@@ -1,0 +1,36 @@
+# apiVersion: 1
+
+# datasources:
+#   - name: 'datasource'
+#     type: 'kinetica-datasource'
+#     access: proxy
+#     isDefault: false
+#     orgId: 1
+#     version: 1
+#     editable: true
+#     jsonData:
+#       path: '/resources'
+#     secureJsonData:
+#       apiKey: 'api-key'
+
+apiVersion: 1
+
+datasources:
+  - name: datasource
+    uid: kinetica-datasource-test
+    type: kinetica-datasource   # Must match the "id" in your plugin.json
+    access: proxy
+    orgId: 1
+    url: ${KINETICA_URL}  # <--- The fix: Pre-fills the URL
+    isDefault: true
+    version: 1
+    editable: true
+
+    jsonData:
+      path: /resources
+      username: ${KINETICA_USER}
+      tlsSkipVerify: true
+
+    # Inject Password (Secure JSON Data) from env var
+    secureJsonData:
+      password: ${KINETICA_PASSWORD}

@@ -1,0 +1,515 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Sample dashboard demonstrating Kinetica datasource plugin capabilities",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "This panel demonstrates a simple SQL query using the Kinetica datasource. Replace the query with your own table and columns.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "smooth",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "legend": {
+          "calcs": ["mean", "max", "min"],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Sample Time Series Query\n-- Replace 'your_schema.your_table' with your actual table\n-- Replace 'timestamp_column' and 'value_column' with your columns\n\nSELECT \n    timestamp_column AS time,\n    value_column AS value\nFROM your_schema.your_table\nWHERE $__timeFilter(timestamp_column)\nORDER BY timestamp_column",
+          "refId": "A"
+        }
+      ],
+      "title": "Time Series Example",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "This panel shows data in a table format. Useful for viewing raw query results.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": ["count"],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Sample Table Query\n-- Replace with your actual table and columns\n\nSELECT *\nFROM your_schema.your_table\nLIMIT 100",
+          "refId": "A"
+        }
+      ],
+      "title": "Table Example",
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "Aggregation query example with GROUP BY",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            }
+          },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 8
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "right",
+          "showLegend": true
+        },
+        "pieType": "pie",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Sample Aggregation Query\n-- Replace with your actual table and columns\n\nSELECT \n    category_column AS category,\n    COUNT(*) AS count\nFROM your_schema.your_table\nGROUP BY category_column\nORDER BY count DESC\nLIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Aggregation Example (Pie Chart)",
+      "type": "piechart"
+    },
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "Stat panel showing a single aggregated value",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 8
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Sample Stat Query\n-- Replace with your actual table\n\nSELECT COUNT(*) AS total_records\nFROM your_schema.your_table",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Records (Stat)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "Bar chart showing grouped data",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 8
+      },
+      "id": 5,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "fullHighlight": false,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Sample Bar Chart Query\n-- Replace with your actual table and columns\n\nSELECT \n    category_column AS category,\n    SUM(value_column) AS total_value\nFROM your_schema.your_table\nGROUP BY category_column\nORDER BY total_value DESC\nLIMIT 10",
+          "refId": "A"
+        }
+      ],
+      "title": "Bar Chart Example",
+      "type": "barchart"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 6,
+      "panels": [],
+      "title": "Query Builder Examples",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "kinetica-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "description": "This panel uses the visual query builder. Edit to see the builder interface.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "id": 7,
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": true,
+          "fields": "",
+          "reducer": ["count"],
+          "show": true
+        },
+        "showHeader": true,
+        "sortBy": []
+      },
+      "pluginVersion": "11.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "rawSql": "-- Query Builder Generated SQL\n-- Edit this panel to use the visual query builder\n\nSELECT *\nFROM your_schema.your_table\nLIMIT 50",
+          "builder": {
+            "schema": "your_schema",
+            "table": "your_table",
+            "columns": ["*"],
+            "limit": 50
+          },
+          "refId": "A"
+        }
+      ],
+      "title": "Query Builder Example",
+      "type": "table"
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": ["kinetica", "sample", "demo"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Kinetica Datasource",
+        "multi": false,
+        "name": "DS_KINETICA",
+        "options": [],
+        "query": "kinetica-datasource",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Kinetica Sample Dashboard",
+  "uid": "kinetica-sample",
+  "version": 1,
+  "weekStart": ""
+}
