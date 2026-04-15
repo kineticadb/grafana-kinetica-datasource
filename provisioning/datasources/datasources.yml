@@ -21,16 +21,15 @@ datasources:
     type: kinetica-datasource   # Must match the "id" in your plugin.json
     access: proxy
     orgId: 1
-    url: ${KINETICA_URL}  # <--- The fix: Pre-fills the URL
+    url: http://localhost:9191
     isDefault: true
     version: 1
     editable: true
 
     jsonData:
       path: /resources
-      username: ${KINETICA_USER}
+      username: test-user
       tlsSkipVerify: true
 
-    # Inject Password (Secure JSON Data) from env var
     secureJsonData:
-      password: ${KINETICA_PASSWORD}
+      password: test-password
