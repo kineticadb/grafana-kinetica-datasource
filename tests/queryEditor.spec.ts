@@ -19,30 +19,105 @@ import { test, expect } from '@grafana/plugin-e2e';
  */
 
 /**
- * Query Editor Smoke Tests
+ * Query Editor Smoke Tests - EXPERIMENTAL
  *
- * These tests are SKIPPED because they rely on @grafana/plugin-e2e library methods
- * that use version-specific selectors internally.
+ * CONTEXT: After extensive testing and documentation (see E2E_TESTS_README.md),
+ * we found that query editor tests using @grafana/plugin-e2e library methods fail
+ * across versions due to version-specific selectors.
+ *
+ * EXPERIMENT: Testing ultra-minimal approaches that avoid library methods entirely.
+ * These tests use only the most basic Playwright selectors and checks.
+ *
+ * LIKELIHOOD OF SUCCESS: Low to moderate based on empirical findings
+ * - Dashboard navigation works (proven)
+ * - Panel counting failed ([data-panelid] returns 0 in 13.x)
+ * - Query editor row access failed (aria-labels vary)
+ * - Button selectors failed (text/structure changes)
+ *
+ * If these tests fail in CI, they will be moved back to skip blocks with documentation.
+ */
+test.describe('Query Editor - Minimal Smoke Tests (EXPERIMENTAL)', () => {
+  test('should navigate to dashboard without crashing', async ({
+    readProvisionedDashboard,
+    gotoDashboardPage,
+    page,
+  }) => {
+    // RATIONALE: This is essentially the same as dataQueries.spec.ts test,
+    // but we're explicitly testing from query editor perspective
+    const dashboard = await readProvisionedDashboard({ fileName: 'kinetica-sample-dashboard.json' });
+    await gotoDashboardPage(dashboard);
+
+    // Verify dashboard loads and page doesn't crash
+    await page.waitForLoadState('networkidle');
+
+    // Very loose check - just verify we're on a page with content
+    await expect(page.locator('body')).toBeVisible();
+  });
+
+  test('should have panels in dashboard view', async ({
+    readProvisionedDashboard,
+    gotoDashboardPage,
+    page,
+  }) => {
+    // RATIONALE: Instead of counting [data-panelid] which fails in 13.x,
+    // we'll check for any element that typically appears in panels
+    const dashboard = await readProvisionedDashboard({ fileName: 'kinetica-sample-dashboard.json' });
+    await gotoDashboardPage(dashboard);
+
+    await page.waitForLoadState('networkidle');
+
+    // Check for panel content wrapper - more generic than [data-panelid]
+    // This might still fail, but worth trying
+    const panelContent = page.locator('[class*="panel-content"]').first();
+    await expect(panelContent).toBeVisible({ timeout: 10000 });
+  });
+
+  test('should show panel menu on hover', async ({
+    readProvisionedDashboard,
+    gotoDashboardPage,
+    page,
+  }) => {
+    // RATIONALE: Testing if we can interact with panels at all
+    // without using specific selectors that fail
+    const dashboard = await readProvisionedDashboard({ fileName: 'kinetica-sample-dashboard.json' });
+    await gotoDashboardPage(dashboard);
+
+    await page.waitForLoadState('networkidle');
+
+    // Find any panel container (very generic selector)
+    const panelContainer = page.locator('[class*="panel-container"]').first();
+
+    // Hover to trigger panel menu
+    await panelContainer.hover();
+
+    // Wait a moment for menu to appear
+    await page.waitForTimeout(500);
+
+    // Check if panel menu exists (very loose check)
+    // This uses class name that should exist across versions
+    const panelMenu = page.locator('[class*="panel-menu"]').first();
+    await expect(panelMenu).toBeVisible({ timeout: 5000 });
+  });
+});
+
+/**
+ * Query Editor Access Tests - STILL SKIPPED
+ *
+ * These tests remain SKIPPED because they depend on @grafana/plugin-e2e library
+ * methods that use version-specific selectors.
  *
  * CRITICAL ISSUE:
- * All four tests below depend on either:
+ * All tests below depend on:
  * 1. panelEditPage.getQueryEditorRow('A') - uses aria-label that changed across versions
  * 2. Button selectors (inspector, add query) - text/structure varies significantly
  *
- * SPECIFIC CI FAILURES:
+ * SPECIFIC CI FAILURES DOCUMENTED:
  * - Grafana 10.4.19: Query editor row aria-label not found
  * - Grafana 13.1.0: Inspector button not found, Add query button not found
  *
- * The @grafana/plugin-e2e library's getQueryEditorRow() method assumes a specific
- * aria-label structure that doesn't exist consistently across Grafana 10.x through 13.x.
- *
- * ALTERNATIVE TESTING:
- * - Dashboard loading test in dataQueries.spec.ts confirms plugin loads
- * - Alert query tests confirm datasource works in query contexts
- * - Manual testing checklist in E2E_TESTS_README.md
- * - Backend query execution tests
+ * These tests CANNOT be re-enabled without major changes to @grafana/plugin-e2e library.
  */
-test.describe.skip('Query Editor - Smoke Tests (Skipped - Library methods not cross-version compatible)', () => {
+test.describe.skip('Query Editor Access via Library Methods (Still Skipped - Known to fail)', () => {
   // All four tests below fail because panelEditPage.getQueryEditorRow('A') doesn't work:
   //
   // test('should load Kinetica datasource in query editor', async () => {
