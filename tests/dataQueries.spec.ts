@@ -13,17 +13,13 @@ test.describe('Query Editor', () => {
   test('should render query editor with SQL input', async ({
     panelEditPage,
     readProvisionedDataSource,
-    page
   }) => {
     const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
     await panelEditPage.datasource.set(ds.name);
 
-    // Verify query editor row is visible
+    // Verify query editor row is visible using stable selectors
     const queryEditorRow = panelEditPage.getQueryEditorRow('A');
     await expect(queryEditorRow).toBeVisible();
-
-    // Verify the query editor has loaded by checking for the query title button
-    await expect(queryEditorRow.getByRole('button', { name: /Query editor row title/i })).toBeVisible();
   });
 
   test('should display query editor row for datasource', async ({

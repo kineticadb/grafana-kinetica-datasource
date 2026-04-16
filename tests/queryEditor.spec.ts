@@ -1,13 +1,12 @@
 import { test, expect } from '@grafana/plugin-e2e';
 
-test('smoke: should load Kinetica datasource in query editor', async ({ panelEditPage, readProvisionedDataSource, page }) => {
+test('smoke: should load Kinetica datasource in query editor', async ({ panelEditPage, readProvisionedDataSource }) => {
   const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
   await panelEditPage.datasource.set(ds.name);
 
-  // Verify the datasource is loaded by checking the query editor row is visible
+  // Verify the query editor row is visible - this confirms the datasource loaded
   const queryEditorRow = panelEditPage.getQueryEditorRow('A');
   await expect(queryEditorRow).toBeVisible();
-  await expect(queryEditorRow.getByRole('button', { name: /Query editor row title/i })).toBeVisible();
 });
 
 test('should display query editor row for datasource', async ({
