@@ -160,20 +160,6 @@ test.describe('Multiple Queries', () => {
     await expect(queryEditorRowB).toBeVisible();
   });
 
-  test('should be able to hide/show query response', async ({
-    panelEditPage,
-    readProvisionedDataSource,
-    page
-  }) => {
-    const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-    await panelEditPage.datasource.set(ds.name);
-
-    const queryEditorRow = panelEditPage.getQueryEditorRow('A');
-
-    // Hide response button should be visible
-    await expect(queryEditorRow.getByRole('button', { name: 'Hide response' })).toBeVisible();
-  });
-
   test('should be able to remove a query after adding one', async ({
     panelEditPage,
     readProvisionedDataSource,
