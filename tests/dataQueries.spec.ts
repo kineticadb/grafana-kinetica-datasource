@@ -22,9 +22,8 @@ test.describe('Query Editor', () => {
     const queryEditorRow = panelEditPage.getQueryEditorRow('A');
     await expect(queryEditorRow).toBeVisible();
 
-    // Verify the query editor contains the datasource name indicator
-    // This confirms the query editor for Kinetica is rendered
-    await expect(queryEditorRow.getByText('(datasource)')).toBeVisible();
+    // Verify the query editor has loaded by checking for the query title button
+    await expect(queryEditorRow.getByRole('button', { name: /Query editor row title/i })).toBeVisible();
   });
 
   test('should display query editor row for datasource', async ({

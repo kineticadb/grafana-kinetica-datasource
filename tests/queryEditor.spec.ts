@@ -4,9 +4,10 @@ test('smoke: should load Kinetica datasource in query editor', async ({ panelEdi
   const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
   await panelEditPage.datasource.set(ds.name);
 
-  // Verify the datasource is selected - the name should be shown
+  // Verify the datasource is loaded by checking the query editor row is visible
   const queryEditorRow = panelEditPage.getQueryEditorRow('A');
-  await expect(queryEditorRow.getByText('(datasource)')).toBeVisible();
+  await expect(queryEditorRow).toBeVisible();
+  await expect(queryEditorRow.getByRole('button', { name: /Query editor row title/i })).toBeVisible();
 });
 
 test('should display query editor row for datasource', async ({

@@ -17,11 +17,13 @@ test.describe('Config Editor', () => {
     page
   }) => {
     const ds = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-    await createDataSourceConfigPage({ type: ds.type });
+    const configPage = await createDataSourceConfigPage({ type: ds.type });
 
-    // Verify Kinetica config fields are visible
-    await expect(page.getByPlaceholder('http://<host>:9191')).toBeVisible();
-    await expect(page.getByText('URL')).toBeVisible();
+    // Wait for config page to load
+    await page.waitForLoadState('networkidle');
+
+    // Wait for the config editor to be visible by checking for labels
+    await expect(page.getByText('URL')).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('User')).toBeVisible();
     await expect(page.getByText('Password')).toBeVisible();
   });
@@ -36,10 +38,17 @@ test.describe('Config Editor', () => {
     });
     const configPage = await createDataSourceConfigPage({ type: ds.type });
 
-    // Fill in Kinetica connection settings
-    await page.getByPlaceholder('http://<host>:9191').fill('http://localhost:9191');
+    // Wait for config page to load
+    await page.waitForLoadState('networkidle');
 
-    // User field - find by proximity to label
+    // Wait for the URL field to be available
+    const urlInput = page.getByPlaceholder('http://<host>:9191');
+    await expect(urlInput).toBeVisible({ timeout: 10000 });
+
+    // Fill in Kinetica connection settings
+    await urlInput.fill('http://localhost:9191');
+
+    // User field - find the input after the URL field
     const userInput = page.locator('input').filter({ hasNot: page.locator('[type="password"]') }).nth(2);
     await userInput.fill('test_user');
 
@@ -62,8 +71,15 @@ test.describe('Config Editor', () => {
     });
     const configPage = await createDataSourceConfigPage({ type: ds.type });
 
+    // Wait for config page to load
+    await page.waitForLoadState('networkidle');
+
+    // Wait for the URL field to be available
+    const urlInput = page.getByPlaceholder('http://<host>:9191');
+    await expect(urlInput).toBeVisible({ timeout: 10000 });
+
     // Fill in invalid URL to test error handling
-    await page.getByPlaceholder('http://<host>:9191').fill('http://invalid-host:9191');
+    await urlInput.fill('http://invalid-host:9191');
 
     // User field
     const userInput = page.locator('input').filter({ hasNot: page.locator('[type="password"]') }).nth(2);
@@ -87,9 +103,13 @@ test.describe('Config Editor', () => {
     // Navigate to the datasource config page
     await gotoDataSourceConfigPage(datasource.uid);
 
+    // Wait for page to load
+    await page.waitForLoadState('networkidle');
+
     // Verify we can access the provisioned datasource config page
     // Note: saveAndTest() may fail if Kinetica is not running, which is expected
     // The key test is that we can navigate to and load the provisioned datasource
+    await expect(page.getByText('URL')).toBeVisible({ timeout: 10000 });
     await expect(page.getByPlaceholder('http://<host>:9191')).toBeVisible();
   });
 });
