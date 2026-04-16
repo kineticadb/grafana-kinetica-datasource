@@ -5,13 +5,15 @@ import { test, expect } from '@grafana/plugin-e2e';
  *
  * TESTING STRATEGY:
  * Following Grafana's best practices, these tests use PROVISIONING instead of UI interactions.
- * The config editor UI changes significantly between Grafana versions (10.4+, 11.x, 12.x),
- * making UI-based tests unreliable. Provisioning provides stable, version-independent testing.
+ *
+ * SCOPE: Plugin now requires Grafana >=12.3.0 (changed from >=10.4.0)
+ * This narrower scope may allow some tests that previously failed.
  *
  * What we test:
  * - Provisioned datasource loads successfully
  * - Can navigate to datasource config page
  * - Config page renders without errors
+ * - Plugin name visibility (EXPERIMENTAL - testing if stable in 12.3-13.x range)
  *
  * What we DON'T test (manual testing required):
  * - Form field interactions (labels/IDs change across versions)
@@ -20,6 +22,7 @@ import { test, expect } from '@grafana/plugin-e2e';
  *
  * @see https://grafana.com/developers/plugin-tools/e2e-test-a-plugin/test-a-panel-plugin
  * @see docs/work-logs/2026-04-16-grafana-e2e-documentation-gap-analysis.md
+ * @see docs/TEST_RE_ENABLING_ANALYSIS.md
  */
 
 test.describe('Config Editor - Provisioned Datasource', () => {
@@ -45,25 +48,54 @@ test.describe('Config Editor - Provisioned Datasource', () => {
     // Different Grafana versions have completely different heading structures
     await expect(page.locator('body')).toBeVisible();
   });
+
+  test('should show plugin type information', async ({
+    readProvisionedDataSource,
+    gotoDataSourceConfigPage,
+    page,
+  }) => {
+    // EXPERIMENT: Re-enabled after narrowing to Grafana >=12.3.0
+    // This test only failed in 10.4.19 (strict mode: 2 elements)
+    // Testing if it works reliably between 12.3-13.x
+    // If this fails in CI, move back to skip block
+
+    const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
+    await gotoDataSourceConfigPage(datasource.uid);
+
+    // Wait for page to load
+    await page.waitForLoadState('networkidle');
+
+    // Check that "Kinetica" appears somewhere on the page
+    // Using exact: false for flexibility
+    await expect(page.getByText('Kinetica', { exact: false })).toBeVisible({
+      timeout: 10000,
+    });
+  });
 });
 
 /**
  * Config Editor Additional Tests
  *
- * These tests are SKIPPED because UI structure varies significantly between versions.
+ * These tests are SKIPPED because UI structure varies significantly even within 12.3-13.x range.
  *
- * TESTS SKIPPED:
- * - Verifying specific settings containers (data-testid changed across versions)
- * - Checking for plugin name visibility (strict mode violations, element count varies)
- * - Verifying page headings (heading structure completely different)
+ * TESTS SKIPPED (after narrowing to >=12.3.0):
+ * - Settings container visibility: data-testid*="data-source-settings" failed in BOTH 10.4.19 AND 13.1.0
+ *   This suggests the testid only exists in intermediate versions (11.x? 12.x early?)
+ *   Would still be unreliable between 12.3 and 13.x
  *
- * These elements exist and work in the plugin, but their DOM structure is too version-specific
- * for reliable automated testing.
+ * - Page headings: Heading structure completely different between versions
+ *
+ * - Error alerts: Structure differs between versions
+ *
+ * NOTE: Plugin name visibility test WAS in this block but moved to active tests as an experiment
+ * after narrowing to >=12.3.0. If it fails, it will be moved back here.
+ *
+ * @see docs/TEST_RE_ENABLING_ANALYSIS.md for detailed failure analysis
  */
-test.describe.skip('Config Editor - Detailed Checks (Skipped - See docs)', () => {
+test.describe.skip('Config Editor - Detailed Checks (Still unreliable even in 12.3+)', () => {
   // Tests would check:
-  // - Settings container visibility (data-testid varies)
-  // - Plugin type information (text appears 0, 1, or 2 times depending on version)
+  // - Settings container visibility (data-testid varies, fails in 13.x)
+  // - Page headings (structure completely different)
   // - Error alerts (structure differs)
 });
 
