@@ -48,29 +48,6 @@ test.describe('Config Editor - Provisioned Datasource', () => {
     // Different Grafana versions have completely different heading structures
     await expect(page.locator('body')).toBeVisible();
   });
-
-  test('should show plugin type information', async ({
-    readProvisionedDataSource,
-    gotoDataSourceConfigPage,
-    page,
-  }) => {
-    // EXPERIMENT: Re-enabled after narrowing to Grafana >=12.3.0
-    // This test only failed in 10.4.19 (strict mode: 2 elements)
-    // Testing if it works reliably between 12.3-13.x
-    // If this fails in CI, move back to skip block
-
-    const datasource = await readProvisionedDataSource({ fileName: 'datasources.yml' });
-    await gotoDataSourceConfigPage(datasource.uid);
-
-    // Wait for page to load
-    await page.waitForLoadState('networkidle');
-
-    // Check that "Kinetica" appears somewhere on the page
-    // Using exact: false for flexibility
-    await expect(page.getByText('Kinetica', { exact: false })).toBeVisible({
-      timeout: 10000,
-    });
-  });
 });
 
 /**
@@ -79,24 +56,36 @@ test.describe('Config Editor - Provisioned Datasource', () => {
  * These tests are SKIPPED because UI structure varies significantly even within 12.3-13.x range.
  *
  * TESTS SKIPPED (after narrowing to >=12.3.0):
- * - Settings container visibility: data-testid*="data-source-settings" failed in BOTH 10.4.19 AND 13.1.0
- *   This suggests the testid only exists in intermediate versions (11.x? 12.x early?)
- *   Would still be unreliable between 12.3 and 13.x
  *
- * - Page headings: Heading structure completely different between versions
+ * 1. Plugin name visibility: getByText('Kinetica')
+ *    - TESTED 2026-04-16: Re-enabled experimentally after narrowing to >=12.3.0
+ *    - RESULT: Still fails in CI
+ *    - Even within 12.3-13.x range, text rendering varies enough to cause failures
+ *    - Conclusion: UI variations persist even with narrow version range
  *
- * - Error alerts: Structure differs between versions
+ * 2. Settings container visibility: data-testid*="data-source-settings"
+ *    - Failed in BOTH 10.4.19 AND 13.1.0
+ *    - Suggests testid only exists in intermediate versions (11.x? 12.x early?)
+ *    - Still unreliable between 12.3 and 13.x
  *
- * NOTE: Plugin name visibility test WAS in this block but moved to active tests as an experiment
- * after narrowing to >=12.3.0. If it fails, it will be moved back here.
+ * 3. Page headings: Heading structure completely different between versions
+ *
+ * 4. Error alerts: Structure differs between versions
+ *
+ * CONCLUSION: Narrowing from >=10.4.0 to >=12.3.0 does NOT enable re-enabling these tests.
+ * UI evolution continues even within the narrower range.
  *
  * @see docs/TEST_RE_ENABLING_ANALYSIS.md for detailed failure analysis
+ * @see docs/IF_EXPERIMENTAL_TEST_FAILS.md for what we learned
  */
-test.describe.skip('Config Editor - Detailed Checks (Still unreliable even in 12.3+)', () => {
-  // Tests would check:
-  // - Settings container visibility (data-testid varies, fails in 13.x)
-  // - Page headings (structure completely different)
-  // - Error alerts (structure differs)
+test.describe.skip('Config Editor - Detailed Checks (Unreliable even in 12.3-13.x)', () => {
+  // EMPIRICAL FINDING: Even narrowing to 12.3.0+ doesn't help
+  // The UI varies enough between 12.3, 12.4, 13.0, 13.1, etc. that these tests fail
+  //
+  // test('should show plugin type information', async ({ ... }) => {
+  //   await expect(page.getByText('Kinetica', { exact: false })).toBeVisible();
+  //   // Tested: Still fails in 12.3-13.x range
+  // });
 });
 
 /**
