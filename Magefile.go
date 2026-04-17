@@ -38,6 +38,11 @@ func BuildBackend() {
 	fmt.Println("Backend build for all platforms complete.")
 }
 
+// BuildAll is an alias for BuildBackend (for CI compatibility)
+func BuildAll() {
+	BuildBackend()
+}
+
 // Coverage runs Go tests with coverage reporting
 func Coverage() error {
 	fmt.Println("Running backend tests with coverage...")
