@@ -31,8 +31,10 @@ Connect Grafana to [Kinetica](https://www.kinetica.com) for real-time analytics 
 
 ## Requirements
 
-- Grafana >= 10.4.0
+- Grafana >= 12.3.0
 - Kinetica >= 7.x
+
+**Note:** Versions prior to 12.3.0 are no longer supported. If you're running Grafana 10.4-12.2, please upgrade Grafana or use an older version of this plugin.
 
 ## Installation
 
