@@ -35,6 +35,12 @@ func BuildFrontend() error {
 // BuildBackend builds the backend for ALL platforms
 func BuildBackend() {
 	mg.Deps(BuildLinux, BuildWindows, BuildDarwin)
+
+	// Copy Go manifest files to dist for plugin validator
+	if err := copyGoManifest(); err != nil {
+		fmt.Printf("Warning: failed to copy Go manifest: %v\n", err)
+	}
+
 	fmt.Println("Backend build for all platforms complete.")
 }
 
@@ -165,4 +171,25 @@ func getBinaryName() (string, error) {
 func Clean() {
 	fmt.Println("Cleaning...")
 	os.RemoveAll("dist")
+}
+
+// copyGoManifest copies go.mod and go.sum to dist/ for plugin validator
+func copyGoManifest() error {
+	// Ensure dist exists
+	if err := os.MkdirAll("dist", 0755); err != nil {
+		return err
+	}
+
+	// Copy go.mod
+	if err := sh.Copy(filepath.Join("dist", "go.mod"), "go.mod"); err != nil {
+		return fmt.Errorf("failed to copy go.mod: %w", err)
+	}
+
+	// Copy go.sum
+	if err := sh.Copy(filepath.Join("dist", "go.sum"), "go.sum"); err != nil {
+		return fmt.Errorf("failed to copy go.sum: %w", err)
+	}
+
+	fmt.Println(" > Copied Go manifest files to dist/")
+	return nil
 }
