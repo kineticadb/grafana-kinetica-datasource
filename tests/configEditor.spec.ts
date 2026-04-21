@@ -36,7 +36,7 @@ test.describe('Config Editor - Provisioned Datasource', () => {
 
     // Verify datasource was provisioned correctly
     expect(datasource.name).toBe('datasource');
-    expect(datasource.type).toBe('kinetica-datasource');
+    expect(datasource.type).toBe('grafana-kinetica-datasource');
 
     // Navigate to the config page
     await gotoDataSourceConfigPage(datasource.uid);

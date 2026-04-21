@@ -30,7 +30,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Plugin configuration
-PLUGIN_ID="kinetica-datasource"
+PLUGIN_ID="grafana-kinetica-datasource"
 DIST_DIR="dist"
 OUTPUT_DIR="."
 
@@ -74,10 +74,12 @@ if [ -f "${ARCHIVE_PATH}" ]; then
 fi
 
 # Create zip archive
-# The archive should contain the plugin files at the root level with the plugin ID as the base directory
-cd "${DIST_DIR}"
-zip -r "../${ARCHIVE_NAME}" . -x "*.map" -x ".DS_Store"
-cd ..
+# The archive should contain the plugin files inside a directory named after the plugin ID
+# Temporarily rename dist to plugin ID for correct archive structure
+mv "${DIST_DIR}" "${PLUGIN_ID}"
+zip -r "${ARCHIVE_NAME}" "${PLUGIN_ID}" -x "*.map" -x ".DS_Store"
+# Rename back to dist
+mv "${PLUGIN_ID}" "${DIST_DIR}"
 
 echo -e "${GREEN}✓ Archive created: ${ARCHIVE_PATH}${NC}"
 
