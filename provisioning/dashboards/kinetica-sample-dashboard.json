@@ -24,7 +24,7 @@
   "panels": [
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "This panel demonstrates a simple SQL query using the Kinetica datasource. Replace the query with your own table and columns.",
@@ -107,7 +107,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Sample Time Series Query\n-- Replace 'your_schema.your_table' with your actual table\n-- Replace 'timestamp_column' and 'value_column' with your columns\n\nSELECT \n    timestamp_column AS time,\n    value_column AS value\nFROM your_schema.your_table\nWHERE $__timeFilter(timestamp_column)\nORDER BY timestamp_column",
@@ -119,7 +119,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "This panel shows data in a table format. Useful for viewing raw query results.",
@@ -170,7 +170,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Sample Table Query\n-- Replace with your actual table and columns\n\nSELECT *\nFROM your_schema.your_table\nLIMIT 100",
@@ -182,7 +182,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "Aggregation query example with GROUP BY",
@@ -230,7 +230,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Sample Aggregation Query\n-- Replace with your actual table and columns\n\nSELECT \n    category_column AS category,\n    COUNT(*) AS count\nFROM your_schema.your_table\nGROUP BY category_column\nORDER BY count DESC\nLIMIT 10",
@@ -242,7 +242,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "Stat panel showing a single aggregated value",
@@ -299,7 +299,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Sample Stat Query\n-- Replace with your actual table\n\nSELECT COUNT(*) AS total_records\nFROM your_schema.your_table",
@@ -311,7 +311,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "Bar chart showing grouped data",
@@ -387,7 +387,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Sample Bar Chart Query\n-- Replace with your actual table and columns\n\nSELECT \n    category_column AS category,\n    SUM(value_column) AS total_value\nFROM your_schema.your_table\nGROUP BY category_column\nORDER BY total_value DESC\nLIMIT 10",
@@ -412,7 +412,7 @@
     },
     {
       "datasource": {
-        "type": "grafana-kinetica-datasource",
+        "type": "kinetica-grafana-datasource",
         "uid": "${DS_KINETICA}"
       },
       "description": "This panel uses the visual query builder. Edit to see the builder interface.",
@@ -463,7 +463,7 @@
       "targets": [
         {
           "datasource": {
-            "type": "grafana-kinetica-datasource",
+            "type": "kinetica-grafana-datasource",
             "uid": "${DS_KINETICA}"
           },
           "rawSql": "-- Query Builder Generated SQL\n-- Edit this panel to use the visual query builder\n\nSELECT *\nFROM your_schema.your_table\nLIMIT 50",
@@ -493,7 +493,7 @@
         "multi": false,
         "name": "DS_KINETICA",
         "options": [],
-        "query": "grafana-kinetica-datasource",
+        "query": "kinetica-grafana-datasource",
         "queryValue": "",
         "refresh": 1,
         "regex": "",

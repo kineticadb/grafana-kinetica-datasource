@@ -30,7 +30,7 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Plugin configuration
-PLUGIN_ID="grafana-kinetica-datasource"
+PLUGIN_ID="kinetica-grafana-datasource"
 DIST_DIR="dist"
 OUTPUT_DIR="."
 

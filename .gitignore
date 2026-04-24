@@ -52,6 +52,7 @@ node_modules/
 dist/
 coverage/
 kinetica-datasource/
+/docs/work-logs/
 
 # Backend Binaries (in case they end up in root)
 gpx_*
