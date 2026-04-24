@@ -3,11 +3,9 @@
 name: Release
 
 on:
-#  push:
-#    tags:
-#      - 'v*' # Run workflow on version tags, e.g. v1.0.0.
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*' # Run workflow on version tags, e.g. v1.0.0.
 
 permissions: read-all
 
@@ -17,6 +15,11 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     steps:
+      - name: Debug refs
+        run: |
+          echo "github.ref: ${{ github.ref }}"
+          echo "github.ref_name: ${{ github.ref_name }}"
+          echo "release.tag_name: ${{ github.event.release.tag_name }}"
       - uses: actions/checkout@v5
         with:
           persist-credentials: false
