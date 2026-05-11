@@ -1,5 +1,5 @@
 import React, { ChangeEvent } from 'react';
-import { InlineField, Input, SecretInput, useStyles2 } from '@grafana/ui';
+import { InlineField, Input, SecretInput, Switch, useStyles2 } from '@grafana/ui';
 import { DataSourcePluginOptionsEditorProps, GrafanaTheme2 } from '@grafana/data';
 import { css } from '@emotion/css';
 import { KineticaDataSourceOptions, KineticaSecureJsonData } from '../types';
@@ -18,7 +18,7 @@ export function ConfigEditor(props: Props) {
   const secureJsonData = (options.secureJsonData || {}) as KineticaSecureJsonData;
   const styles = useStyles2(getStyles);
 
-  const onDataChange = (key: keyof KineticaDataSourceOptions, value: string) => {
+  const onDataChange = (key: keyof KineticaDataSourceOptions, value: string | boolean) => {
     onOptionsChange({ ...options, jsonData: { ...jsonData, [key]: value } });
   };
 
@@ -50,6 +50,9 @@ export function ConfigEditor(props: Props) {
       </InlineField>
       <InlineField label="Password" labelWidth={12}>
         <SecretInput isConfigured={Boolean(secureJsonFields?.password)} value={secureJsonData.password || ''} onReset={onResetPassword} onChange={onPasswordChange} width={20}/>
+      </InlineField>
+      <InlineField label="Skip TLS Verify" labelWidth={12} tooltip="Skip TLS certificate verification (insecure, use only for testing)">
+        <Switch value={jsonData.tlsSkipVerify || false} onChange={(e) => onDataChange('tlsSkipVerify', e.currentTarget.checked)} />
       </InlineField>
     </div>
   );

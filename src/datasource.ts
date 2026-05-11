@@ -18,6 +18,10 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
   query(request: DataQueryRequest<KineticaQuery>): Observable<DataQueryResponse> {
     return super.query(request).pipe(
       map((response) => {
+        // Ensure response.data is an array
+        if (!response || !Array.isArray(response.data)) {
+          return response;
+        }
         // Iterate over each DataFrame in the response (usually one per query)
         response.data.forEach((dataItem: any) => {
           // Ensure it's a valid DataFrame with fields
@@ -88,20 +92,38 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
 
   // 1. Get Schemas
   async getSchemas(): Promise<string[]> {
-    return this.getResource('schemas');
+    try {
+      const result = await this.getResource('schemas');
+      return Array.isArray(result) ? result : [];
+    } catch (err) {
+      console.error('Failed to fetch schemas:', err);
+      return [];
+    }
   }
-  
+
   // 2. Get Tables
   async getTableNames(schema?: string): Promise<string[]> {
-    return this.getResource('tables', { schema });
+    try {
+      const result = await this.getResource('tables', { schema });
+      return Array.isArray(result) ? result : [];
+    } catch (err) {
+      console.error('Failed to fetch tables:', err);
+      return [];
+    }
   }
 
   // 3. Get Columns
   async getColumns(schema: string | undefined, tableName: string): Promise<string[]> {
-    const params: any = { table: tableName };
-    if (schema) {
-      params.schema = schema;
+    try {
+      const params: any = { table: tableName };
+      if (schema) {
+        params.schema = schema;
+      }
+      const result = await this.getResource('columns', params);
+      return Array.isArray(result) ? result : [];
+    } catch (err) {
+      console.error('Failed to fetch columns:', err);
+      return [];
     }
-    return this.getResource('columns', params);
   }
 }

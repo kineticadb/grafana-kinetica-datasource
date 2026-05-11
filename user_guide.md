@@ -2,7 +2,7 @@
 
 ## User Guide
 
-**Version 1.0.0**
+**Version 1.0.1**
 
 *Connecting Grafana to Kinetica*
 
@@ -179,21 +179,23 @@ Configure the following settings for your Kinetica instance:
 
 | Setting | Description |
 |---------|-------------|
-| Host URL | The full URL to your Kinetica instance (e.g., `https://kinetica.example.com:9191`) |
-| Username | Database username with query permissions |
+| URL | The full URL to your Kinetica instance (e.g., `http://kinetica.example.com:9191`) |
+| User | Database username with query permissions |
 | Password | Database password (stored securely in Grafana) |
-| Schema | Default schema for queries (optional) |
-| Timeout | Query timeout in seconds (default: 30) |
+| Skip TLS Verify | Disable TLS certificate verification (use only for testing/development) |
+
+> **Note:** When running Grafana in Docker and Kinetica on the host machine, use `http://host.docker.internal:9191` as the URL instead of `localhost`.
 
 ### 4.3 Advanced Settings
 
 #### 4.3.1 SSL/TLS Configuration
 
-For secure connections, ensure:
+For secure connections:
 
-- Host URL uses `https://` protocol
-- Valid SSL certificates are configured on Kinetica server
-- Certificate verification is enabled (recommended for production)
+- Use `https://` protocol in the URL
+- Valid SSL certificates should be configured on the Kinetica server
+- Keep "Skip TLS Verify" **disabled** in production (default)
+- Only enable "Skip TLS Verify" for development/testing with self-signed certificates
 
 #### 4.3.2 Connection Pooling
 
@@ -489,9 +491,12 @@ GF_LOG_FILTERS=plugin.kinetica-datasource:debug
 
 When running Grafana in Docker and Kinetica on the host:
 
-- Use `host.docker.internal` instead of `localhost` in the Host URL
-- Configure `extra_hosts` in docker-compose.yaml (already included)
+- Use `host.docker.internal` instead of `localhost` in the URL field
+  - Example: `http://host.docker.internal:9191`
+- The `extra_hosts` mapping is already configured in the included docker-compose.yaml
 - Ensure Docker's network mode allows host gateway access
+
+> **Important:** Using `localhost` or `127.0.0.1` will not work when Grafana runs in a Docker container, as these addresses refer to the container itself, not the host machine.
 
 ### 8.4 Getting Support
 

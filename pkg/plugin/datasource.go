@@ -42,7 +42,7 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 		return nil, err
 	}
 
-	db := createClient(config, req.PluginContext.DataSourceInstanceSettings)
+	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
 	response := backend.NewQueryDataResponse()
 
 	for _, q := range req.Queries {
@@ -66,13 +66,14 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 	// 2. Prepare SQL (Macros)
 	sql, err := prepareSql(ctx, query, db)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("Macro error: %v", err))
+		logError("Macro expansion failed", "refId", query.RefID, "err", err)
+		return backend.ErrDataResponse(backend.StatusBadRequest, "Query failed, see Grafana server log for details")
 	}
 	if sql == "" {
 		return backend.DataResponse{}
 	}
 
-	logInfo("Macro replacement complete", "refId", query.RefID, "final_sql", sql)
+	logDebug("Macro replacement complete", "refId", query.RefID, "final_sql", sql)
 
 	// 3. Determine Table Name for Metadata Lookup
 	fullTableName := qModel.Builder.Table
@@ -134,20 +135,23 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 	options := &kinetica.ExecuteSqlOptions{Encoding: "binary"}
 	rawResp, err := db.ExecuteSqlRawWithOpts(ctx, sql, 0, -9999, "", nil, options)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusBadGateway, fmt.Sprintf("Kinetica Error: %v", err))
+		logError("Kinetica query execution failed", "refId", query.RefID, "err", err)
+		return backend.ErrDataResponse(backend.StatusBadGateway, "Query failed, see Grafana server log for details")
 	}
 
 	// 7. Parse Avro Schema
 	schema, err := avro.Parse(rawResp.ResponseSchema)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("Schema Parse Error: %v", err))
+		logError("Avro schema parse failed", "refId", query.RefID, "err", err)
+		return backend.ErrDataResponse(backend.StatusInternal, "Query failed, see Grafana server log for details")
 	}
 
 	// 8. Unmarshal Data
 	rawMap := make(map[string]any)
 	err = avro.Unmarshal(schema, rawResp.BinaryEncodedResponse, &rawMap)
 	if err != nil {
-		return backend.ErrDataResponse(backend.StatusInternal, fmt.Sprintf("Avro Unmarshal Error: %v", err))
+		logError("Avro unmarshal failed", "refId", query.RefID, "err", err)
+		return backend.ErrDataResponse(backend.StatusInternal, "Query failed, see Grafana server log for details")
 	}
 
 	// 9. Extract Headers & Clean Data
@@ -307,8 +311,15 @@ func getColumnIsString(ctx context.Context, db *kinetica.Kinetica, schema, table
 // -------------------------------------------------------------------------
 
 func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-	config, _ := loadSettings(req.PluginContext.DataSourceInstanceSettings)
-	db := createClient(config, req.PluginContext.DataSourceInstanceSettings)
+	config, err := loadSettings(req.PluginContext.DataSourceInstanceSettings)
+	if err != nil {
+		logError("Failed to load settings", "err", err)
+		return sender.Send(&backend.CallResourceResponse{
+			Status: http.StatusInternalServerError,
+			Body:   []byte("Failed to load datasource settings"),
+		})
+	}
+	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
 
 	parsedUrl, _ := url.Parse(req.URL)
 	qParams := parsedUrl.Query()
@@ -373,9 +384,10 @@ func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResource
 }
 
 func sendError(sender backend.CallResourceResponseSender, err error) error {
+	logError("Resource request failed", "err", err)
 	return sender.Send(&backend.CallResourceResponse{
 		Status: http.StatusInternalServerError,
-		Body:   []byte(err.Error()),
+		Body:   []byte("Request failed, see Grafana server log for details"),
 	})
 }
 
@@ -388,7 +400,7 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 	if err != nil {
 		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: "Config error"}, nil
 	}
-	db := createClient(config, req.PluginContext.DataSourceInstanceSettings)
+	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
 	if _, err := db.ShowSystemPropertiesRaw(ctx); err != nil {
 		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error()}, nil
 	}
@@ -408,7 +420,7 @@ func loadSettings(s *backend.DataSourceInstanceSettings) (*DataSourceSettings, e
 	return &cfg, nil
 }
 
-func createClient(cfg *DataSourceSettings, s *backend.DataSourceInstanceSettings) *kinetica.Kinetica {
+func createClient(ctx context.Context, cfg *DataSourceSettings, s *backend.DataSourceInstanceSettings) *kinetica.Kinetica {
 	dbUrl := s.URL
 	if dbUrl == "" {
 		dbUrl = cfg.URL
@@ -425,12 +437,12 @@ func createClient(cfg *DataSourceSettings, s *backend.DataSourceInstanceSettings
 
 	opts := kinetica.KineticaOptions{
 		Username:           cfg.Username,
-		ByPassSslCertCheck: true,
+		ByPassSslCertCheck: cfg.TlsSkipVerify,
 	}
 	if s.DecryptedSecureJSONData != nil {
 		opts.Password = s.DecryptedSecureJSONData["password"]
 	}
-	return kinetica.NewWithOptions(context.TODO(), dbUrl, &opts)
+	return kinetica.NewWithOptions(ctx, dbUrl, &opts)
 }
 
 func parseToFrame(results *map[string]any, timeCols map[string]bool, refID string) (*data.Frame, error) {

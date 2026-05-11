@@ -377,11 +377,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   return (
     <div className={styles.builderContainer}>
       {isRoot && <h5 className={styles.builderTitle}>SQL Builder</h5>}
-      {aliasError && <Alert title="Validation Error" severity="error" style={{marginBottom: 10}}>{aliasError}</Alert>}
+      {aliasError && <Alert title="Validation Error" severity="error" style={{marginBottom: 10}}>{String(aliasError)}</Alert>}
 
       <Stack direction="row" gap={1}>
-        <Field label="Schema"><Combobox options={schemaOptions} value={builder.schema} onChange={v => onSchemaChange(v?.value!)} width={25} /></Field>
-        <div style={{ flexGrow: 1 }}><Field label="Table"><Combobox options={tableOptions} value={builder.table} onChange={v => onTableChange(v?.value!)} /></Field></div>
+        <Field label="Schema"><Combobox options={schemaOptions} value={builder.schema || null} onChange={v => onSchemaChange(v?.value ?? '')} width={25} /></Field>
+        <div style={{ flexGrow: 1 }}><Field label="Table"><Combobox options={tableOptions} value={builder.table || null} onChange={v => onTableChange(v?.value ?? '')} /></Field></div>
         <Field label="Alias"><Input value={builder.alias || ''} onChange={e => update('alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
         <Field label="Distinct"><Switch value={builder.distinct ?? false} onChange={e => update('distinct', e.currentTarget.checked)} /></Field>
       </Stack>
@@ -393,11 +393,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             <div key={i} className={styles.selectRow}>
                 <Stack direction="row" gap={1}>
                     <Field label={i===0?"Aggregate":""} style={{marginBottom:0}}>
-                        <Combobox options={AGG_FUNCS} value={s.aggregate} onChange={v => updateSelect(i, 'aggregate', (v?.value === '' || v?.value === undefined) ? undefined : v.value)} width={24} placeholder="Func" />
+                        <Combobox options={AGG_FUNCS} value={s.aggregate || null} onChange={v => updateSelect(i, 'aggregate', (v?.value === '' || v?.value === undefined) ? undefined : v.value)} width={24} placeholder="Func" />
                     </Field>
                     <div style={{flexGrow: 1}}>
                          <Field label={i===0?"Column":""} style={{marginBottom:0}}>
-                            <Combobox options={allColumnOptions} value={s.table ? `${s.table}.${s.column}` : s.column} onChange={v => updateSelect(i, 'column', v?.value)} />
+                            <Combobox options={allColumnOptions} value={s.table ? `${s.table}.${s.column}` : (s.column || null)} onChange={v => updateSelect(i, 'column', v?.value)} />
                          </Field>
                     </div>
                     <Field label={i===0?"Alias":""} style={{marginBottom:0}}>
@@ -424,8 +424,8 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
           return (
             <div key={i} className={styles.joinContainer}>
               <Stack direction="row" gap={1}>
-                <Field label={i === 0 ? 'Type' : ''}><Combobox options={JOIN_TYPES} value={j.type} onChange={v => updateJoin(i, 'type', v?.value)} width={20} /></Field>
-                <div style={{ flexGrow: 1 }}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableOptions} value={j.table} onChange={v => updateJoin(i, 'table', v?.value)} /></Field></div>
+                <Field label={i === 0 ? 'Type' : ''}><Combobox options={JOIN_TYPES} value={j.type || null} onChange={v => updateJoin(i, 'type', v?.value)} width={20} /></Field>
+                <div style={{ flexGrow: 1 }}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} /></Field></div>
                 <Field label={i === 0 ? 'Alias' : ''}><Input value={j.alias || ''} onChange={e => updateJoin(i, 'alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
                 <div style={{ marginTop: i === 0 ? 22 : 0 }}><IconButton name="trash-alt" variant="secondary" aria-label="Remove Join" onClick={() => removeJoin(i)} /></div>
               </Stack>
@@ -438,13 +438,13 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
                   {j.conditions?.map((cond, condIdx) => (
                       <Stack key={condIdx} direction="row" gap={1} alignItems="center">
                           {condIdx > 0 && (
-                              <Combobox options={LOGIC_OPS} value={cond.logic} onChange={v => updateJoinCondition(i, condIdx, 'logic', v.value!)} width={16} />
+                              <Combobox options={LOGIC_OPS} value={cond.logic || 'AND'} onChange={v => updateJoinCondition(i, condIdx, 'logic', v.value ?? 'AND')} width={16} />
                           )}
                           {condIdx === 0 && <div className={styles.logicSpacerSmall}></div>}
 
-                          <Combobox options={leftOptions} placeholder="Left" value={cond.left} onChange={v => updateJoinCondition(i, condIdx, 'left', v?.value!)} />
+                          <Combobox options={leftOptions} placeholder="Left" value={cond.left || null} onChange={v => updateJoinCondition(i, condIdx, 'left', v?.value ?? '')} />
                           <div style={{ fontWeight: 'bold' }}>=</div>
-                          <Combobox options={rightOptions} placeholder="Right" value={cond.right} onChange={v => updateJoinCondition(i, condIdx, 'right', v?.value!)} />
+                          <Combobox options={rightOptions} placeholder="Right" value={cond.right || null} onChange={v => updateJoinCondition(i, condIdx, 'right', v?.value ?? '')} />
                           <IconButton name="trash-alt" size="sm" variant="secondary" aria-label="Remove Condition" onClick={() => removeJoinCondition(i, condIdx)} />
                       </Stack>
                   ))}
@@ -459,11 +459,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
       {builder.filters?.map((f, i) => (
         <div key={i} className={styles.filterRow}>
           <Stack direction="row" gap={1}>
-            {i > 0 && <Combobox options={LOGIC_OPS} value={f.logic} onChange={v => updateFilterList('filters', i, 'logic', v.value)} width={16} />}
+            {i > 0 && <Combobox options={LOGIC_OPS} value={f.logic || 'AND'} onChange={v => updateFilterList('filters', i, 'logic', v.value)} width={16} />}
             {i === 0 && <div className={styles.logicSpacer}></div>}
-            <Combobox options={allColumnOptions} value={f.key} onChange={v => updateFilterList('filters', i, 'key', v?.value)} width={20} />
-            <Input value={f.operator} onChange={e => updateFilterList('filters', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
-            <div style={{ flexGrow: 1 }}><Input value={f.value} onChange={e => updateFilterList('filters', i, 'value', e.currentTarget.value)} placeholder="value" /></div>
+            <Combobox options={allColumnOptions} value={f.key || null} onChange={v => updateFilterList('filters', i, 'key', v?.value)} width={20} />
+            <Input value={f.operator || ''} onChange={e => updateFilterList('filters', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
+            <div style={{ flexGrow: 1 }}><Input value={f.value || ''} onChange={e => updateFilterList('filters', i, 'value', e.currentTarget.value)} placeholder="value" /></div>
             <IconButton name="trash-alt" variant="secondary" aria-label="Remove Filter" onClick={() => removeFilterList('filters', i)} />
           </Stack>
         </div>
@@ -471,7 +471,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
       <div style={{ marginBottom: 15 }}>
         <Stack direction="row" gap={2}>
           <Button size="sm" variant="secondary" icon="plus" onClick={() => addFilterList('filters')}>Add Filter</Button>
-          <div style={{ flexGrow: 0 }}><Field label="Time Column" style={{ marginBottom: 0 }}><Combobox options={allColumnOptions} value={builder.timeColumn} onChange={v => update('timeColumn', v?.value)} width={20} /></Field></div>
+          <div style={{ flexGrow: 0 }}><Field label="Time Column" style={{ marginBottom: 0 }}><Combobox options={allColumnOptions} value={builder.timeColumn || null} onChange={v => update('timeColumn', v?.value)} width={20} /></Field></div>
         </Stack>
       </div>
 
@@ -479,9 +479,9 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
       <div className={styles.groupSection}>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: 15 }}>
            <div style={{ flexGrow: 1 }}>
-             <Field label="Group By"><MultiCombobox options={combinedOptions} value={builder.groupBy?.map((c) => ({ label: c, value: c }))} onChange={v => update('groupBy', v.map((i) => i.value!))} /></Field>
+             <Field label="Group By"><MultiCombobox options={combinedOptions} value={(builder.groupBy || []).map((c) => ({ label: c, value: c }))} onChange={v => update('groupBy', v.map((i) => i.value!))} /></Field>
            </div>
-           <Field label="Limit"><Input type="number" value={builder.limit ?? 1000} onChange={e => update('limit', parseInt(e.currentTarget.value, 10))} width={10} /></Field>
+           <Field label="Limit"><Input type="number" value={builder.limit !== undefined ? builder.limit : 1000} onChange={e => update('limit', parseInt(e.currentTarget.value, 10) || 1000)} width={10} /></Field>
         </div>
 
         {builder.groupBy && builder.groupBy.length > 0 && (
@@ -490,11 +490,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             {builder.having?.map((f, i) => (
               <div key={i} className={styles.filterRow}>
                 <Stack direction="row" gap={1}>
-                  {i > 0 && <Combobox options={LOGIC_OPS} value={f.logic} onChange={v => updateFilterList('having', i, 'logic', v.value)} width={16} />}
+                  {i > 0 && <Combobox options={LOGIC_OPS} value={f.logic || 'AND'} onChange={v => updateFilterList('having', i, 'logic', v.value)} width={16} />}
                   {i === 0 && <div className={styles.logicSpacer}></div>}
-                  <Combobox options={combinedOptions} value={f.key} onChange={v => updateFilterList('having', i, 'key', v?.value)} width={20} />
-                  <Input value={f.operator} onChange={e => updateFilterList('having', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
-                  <Input value={f.value} onChange={e => updateFilterList('having', i, 'value', e.currentTarget.value)} style={{flexGrow: 1}} placeholder="value" />
+                  <Combobox options={combinedOptions} value={f.key || null} onChange={v => updateFilterList('having', i, 'key', v?.value)} width={20} />
+                  <Input value={f.operator || ''} onChange={e => updateFilterList('having', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
+                  <Input value={f.value || ''} onChange={e => updateFilterList('having', i, 'value', e.currentTarget.value)} style={{flexGrow: 1}} placeholder="value" />
                   <IconButton name="trash-alt" variant="secondary" aria-label="Remove Having" onClick={() => removeFilterList('having', i)} />
                 </Stack>
               </div>
@@ -508,8 +508,8 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
           {builder.orderBy?.map((o, i) => (
              <div key={i} className={styles.orderByRow}>
                <Stack direction="row" gap={1}>
-                 <Combobox options={combinedOptions} value={o.column} onChange={v => updateOrder(i, 'column', v?.value)} width={20} />
-                 <Combobox options={SORT_DIRS} value={o.direction} onChange={v => updateOrder(i, 'direction', v?.value)} width={16} />
+                 <Combobox options={combinedOptions} value={o.column || null} onChange={v => updateOrder(i, 'column', v?.value)} width={20} />
+                 <Combobox options={SORT_DIRS} value={o.direction || 'ASC'} onChange={v => updateOrder(i, 'direction', v?.value)} width={16} />
                  <IconButton name="trash-alt" variant="secondary" aria-label="Remove Sort" onClick={() => removeOrder(i)} />
                </Stack>
              </div>
@@ -524,7 +524,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
           <div className={styles.setOpHeader}>
             <Stack direction="row" gap={2}>
               <div className={styles.setOpLabel}>OPERATOR:</div>
-              <Combobox options={SET_OPS} value={op.operator} onChange={(v) => updateSetOperator(i, v?.value as KineticaSetOperator)} width={35} />
+              <Combobox options={SET_OPS} value={op.operator || 'UNION'} onChange={(v) => updateSetOperator(i, v?.value as KineticaSetOperator)} width={35} />
               <IconButton name="trash-alt" variant="secondary" aria-label="Remove Set Op" onClick={() => removeSetOp(i)} />
             </Stack>
           </div>
@@ -542,6 +542,10 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
 
 export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) {
   const styles = useStyles2(getStyles);
+
+  // Ensure rawSql is always a string
+  const safeRawSql = typeof query.rawSql === 'string' ? query.rawSql : '';
+
   const [isRawSql, setIsRawSql] = useState(!query.builder);
   const rawBuilder = query.builder || { schema: '', table: '' };
   let initialSelects = rawBuilder.selects;
@@ -561,23 +565,23 @@ export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) 
 
   // --- LOCAL STATE FOR RAW EDITOR ---
   // Using derived state pattern (sync during render) to avoid useEffect lint errors.
-  const [tempRawSql, setTempRawSql] = useState(query.rawSql || '');
-  const [lastSyncedSql, setLastSyncedSql] = useState(query.rawSql || '');
+  const [tempRawSql, setTempRawSql] = useState(safeRawSql);
+  const [lastSyncedSql, setLastSyncedSql] = useState(safeRawSql);
 
   // If props have changed externally since last sync:
-  if (query.rawSql !== lastSyncedSql) {
+  if (safeRawSql !== lastSyncedSql) {
       // Check if the change is just a flattened version of our current state
       // (This happens when we blur/save: formatting is lost in prop, but we want to keep it in editor)
       const currentFlattened = tempRawSql.replace(/[\r\n]+/g, ' ');
-      const isJustFlattened = query.rawSql === currentFlattened;
+      const isJustFlattened = safeRawSql === currentFlattened;
 
       if (!isJustFlattened) {
           // It's a real external change (Reset, or query switch), so overwrite local state
-          setTempRawSql(query.rawSql || '');
+          setTempRawSql(safeRawSql);
       }
 
       // Update tracker so we don't sync again until next prop change
-      setLastSyncedSql(query.rawSql || '');
+      setLastSyncedSql(safeRawSql);
   }
 
   const onRawSqlBlur = () => {
@@ -611,7 +615,7 @@ export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) 
       ) : (
         <div className={styles.formGroup}>
           <BuilderForm datasource={datasource} builder={builder} onChange={onBuilderChange} isRoot={true} />
-          <Alert title="SQL Preview" severity="info" className={styles.sqlPreview}>{query.rawSql || ''}</Alert>
+          <Alert title="SQL Preview" severity="info" className={styles.sqlPreview}>{safeRawSql}</Alert>
           <Button onClick={onRunQuery} variant="primary">Run Query</Button>
         </div>
       )}

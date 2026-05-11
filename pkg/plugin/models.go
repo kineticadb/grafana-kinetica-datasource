@@ -3,9 +3,10 @@ package plugin
 import "encoding/json"
 
 type DataSourceSettings struct {
-	URL      string `json:"url"`
-	Password string `json:"password"`
-	Username string `json:"username"`
+	URL           string `json:"url"`
+	Password      string `json:"password"`
+	Username      string `json:"username"`
+	TlsSkipVerify bool   `json:"tlsSkipVerify"`
 }
 
 // KineticaSelect represents a single column selection from the frontend builder

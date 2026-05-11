@@ -38,7 +38,24 @@
         "url": "https://www.kinetica.com"
       }
     ],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "Configuration",
+        "path": "img/config-editor.png"
+      },
+      {
+        "name": "Connection Test",
+        "path": "img/config-success.png"
+      },
+      {
+        "name": "Query Builder",
+        "path": "img/query-editor.png"
+      },
+      {
+        "name": "Raw SQL Editor",
+        "path": "img/query-raw-editor.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },

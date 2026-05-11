@@ -13,6 +13,7 @@ export const defaultQuery: Partial<KineticaQuery> = {
 export interface KineticaDataSourceOptions extends DataSourceJsonData {
   url?: string;
   username?: string;
+  tlsSkipVerify?: boolean;
 }
 
 export interface KineticaSecureJsonData {
