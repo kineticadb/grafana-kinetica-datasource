@@ -27,26 +27,28 @@ var (
 	_ backend.CallResourceHandler = (*Datasource)(nil)
 )
 
-type Datasource struct{}
+type Datasource struct {
+	client *kinetica.Kinetica
+}
 
-func NewDatasource(ctx context.Context, _ backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
-	return &Datasource{}, nil
+func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
+	config, err := loadSettings(&settings)
+	if err != nil {
+		logError("NewDatasource: failed to load settings", "err", err)
+		return nil, err
+	}
+	client := createClient(ctx, config, &settings)
+	return &Datasource{client: client}, nil
 }
 
 // -------------------------------------------------------------------------
 // 1. QUERY DATA
 // -------------------------------------------------------------------------
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	config, err := loadSettings(req.PluginContext.DataSourceInstanceSettings)
-	if err != nil {
-		return nil, err
-	}
-
-	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
 	response := backend.NewQueryDataResponse()
 
 	for _, q := range req.Queries {
-		res := d.query(ctx, db, q)
+		res := d.query(ctx, d.client, q)
 		response.Responses[q.RefID] = res
 	}
 
@@ -55,7 +57,7 @@ func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataReques
 
 func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query backend.DataQuery) backend.DataResponse {
 
-	logInfo("Starting query processing", "refId", query.RefID)
+	logDebug("Starting query processing", "refId", query.RefID)
 
 	// 1. Parse Query Model
 	var qModel QueryModel
@@ -311,22 +313,16 @@ func getColumnIsString(ctx context.Context, db *kinetica.Kinetica, schema, table
 // -------------------------------------------------------------------------
 
 func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResourceRequest, sender backend.CallResourceResponseSender) error {
-	config, err := loadSettings(req.PluginContext.DataSourceInstanceSettings)
+	parsedUrl, err := url.Parse(req.URL)
 	if err != nil {
-		logError("Failed to load settings", "err", err)
-		return sender.Send(&backend.CallResourceResponse{
-			Status: http.StatusInternalServerError,
-			Body:   []byte("Failed to load datasource settings"),
-		})
+		logError("Failed to parse request URL", "url", req.URL, "err", err)
+		return sendError(sender, fmt.Errorf("invalid request URL"))
 	}
-	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
-
-	parsedUrl, _ := url.Parse(req.URL)
 	qParams := parsedUrl.Query()
 
 	// SCHEMAS
 	if req.Path == "schemas" {
-		resp, err := db.ShowTableRawWithOpts(ctx, "", &kinetica.ShowTableOptions{ShowChildren: true})
+		resp, err := d.client.ShowTableRawWithOpts(ctx, "", &kinetica.ShowTableOptions{ShowChildren: true})
 		if err != nil {
 			return sendError(sender, err)
 		}
@@ -340,7 +336,7 @@ func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResource
 		if schema == "" {
 			return sendError(sender, fmt.Errorf("missing 'schema' query parameter"))
 		}
-		resp, err := db.ShowTableRawWithOpts(ctx, schema, &kinetica.ShowTableOptions{ShowChildren: true})
+		resp, err := d.client.ShowTableRawWithOpts(ctx, schema, &kinetica.ShowTableOptions{ShowChildren: true})
 		if err != nil {
 			return sendError(sender, err)
 		}
@@ -362,7 +358,7 @@ func (d *Datasource) CallResource(ctx context.Context, req *backend.CallResource
 			fullTableName = fmt.Sprintf("%s.%s", schema, table)
 		}
 
-		resp, err := db.ShowTableRawWithOpts(ctx, fullTableName, &kinetica.ShowTableOptions{GetColumnInfo: true})
+		resp, err := d.client.ShowTableRawWithOpts(ctx, fullTableName, &kinetica.ShowTableOptions{GetColumnInfo: true})
 		if err != nil {
 			return sendError(sender, err)
 		}
@@ -396,13 +392,9 @@ func sendError(sender backend.CallResourceResponseSender, err error) error {
 // -------------------------------------------------------------------------
 
 func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
-	config, err := loadSettings(req.PluginContext.DataSourceInstanceSettings)
-	if err != nil {
-		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: "Config error"}, nil
-	}
-	db := createClient(ctx, config, req.PluginContext.DataSourceInstanceSettings)
-	if _, err := db.ShowSystemPropertiesRaw(ctx); err != nil {
-		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: err.Error()}, nil
+	if _, err := d.client.ShowSystemPropertiesRaw(ctx); err != nil {
+		logError("CheckHealth: connection to Kinetica failed", "err", err)
+		return &backend.CheckHealthResult{Status: backend.HealthStatusError, Message: "Connection to Kinetica failed, see Grafana server log for details"}, nil
 	}
 	return &backend.CheckHealthResult{Status: backend.HealthStatusOk, Message: "Success"}, nil
 }

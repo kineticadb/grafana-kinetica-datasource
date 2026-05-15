@@ -268,19 +268,16 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const onSchemaChange = (v: string) => { setTableOptions([]); setAllColumnOptions([]); onChange({ ...builder, schema: v, table: '', selects: [], joins: [], groupBy: [], orderBy: [] }); };
   const onTableChange = (v: string) => { setAllColumnOptions([]); onChange({ ...builder, table: v, selects: [], filters: [] }); };
 
-  const updateSelect = (i: number, field: keyof KineticaSelect, val: any) => {
+  const updateSelect = (i: number, field: keyof KineticaSelect, val: string | undefined) => {
       const list = [...(builder.selects || [])];
       if (field === 'column') {
           const matchedOpt = allColumnOptions.find(o => o.value === val);
           if (matchedOpt) {
-              // @ts-ignore
               list[i] = { ...list[i], column: matchedOpt.rawColumn, table: matchedOpt.rawTableAlias };
           } else {
-              // @ts-ignore
-              list[i] = { ...list[i], column: val, table: undefined };
+              list[i] = { ...list[i], column: val ?? '', table: undefined };
           }
       } else {
-          // @ts-ignore
           list[i] = { ...list[i], [field]: val };
       }
       update('selects', list);
@@ -297,9 +294,8 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
       update('selects', list);
   };
 
-  const updateJoin = (i: number, field: keyof KineticaJoin, val: any) => {
+  const updateJoin = (i: number, field: keyof KineticaJoin, val: string | KineticaJoinCondition[] | undefined) => {
     const list = [...(builder.joins || [])];
-    // @ts-ignore
     list[i] = { ...list[i], [field]: val };
     update('joins', list);
   };
@@ -338,10 +334,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const updateJoinCondition = (joinIdx: number, condIdx: number, field: keyof KineticaJoinCondition, val: string) => {
       const joins = [...(builder.joins || [])];
       const conditions = [...(joins[joinIdx].conditions || [])];
-      // @ts-ignore
-      if (field === 'left' || field === 'right') {conditions[condIdx] = { ...conditions[condIdx], [field]: quoteIdentifier(val) };}
-      // @ts-ignore
-      else {conditions[condIdx] = { ...conditions[condIdx], [field]: val };}
+      if (field === 'left' || field === 'right') {
+          conditions[condIdx] = { ...conditions[condIdx], [field]: quoteIdentifier(val) };
+      } else {
+          conditions[condIdx] = { ...conditions[condIdx], [field]: val as 'AND' | 'OR' | string };
+      }
       joins[joinIdx] = { ...joins[joinIdx], conditions };
       update('joins', joins);
   };
@@ -354,10 +351,9 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const addFilterList = (key: 'filters' | 'having') => update(key, [...(builder[key] || []), { logic: 'AND', key: '', operator: '=', value: '' }]);
   const removeFilterList = (key: 'filters' | 'having', i: number) => { const list = [...(builder[key] || [])]; list.splice(i, 1); update(key, list); };
 
-  const updateOrder = (i: number, field: keyof KineticaOrderBy, val: any) => {
+  const updateOrder = (i: number, field: keyof KineticaOrderBy, val: string | undefined) => {
     const list = [...(builder.orderBy || [])];
-    // @ts-ignore
-    list[i] = { ...list[i], [field]: val };
+    list[i] = { ...list[i], [field]: val as string & ('ASC' | 'DESC') };
     update('orderBy', list);
   };
   const addOrder = () => update('orderBy', [...(builder.orderBy || []), { column: '', direction: 'ASC' }]);

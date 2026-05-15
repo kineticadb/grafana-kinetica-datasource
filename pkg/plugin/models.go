@@ -4,7 +4,6 @@ import "encoding/json"
 
 type DataSourceSettings struct {
 	URL           string `json:"url"`
-	Password      string `json:"password"`
 	Username      string `json:"username"`
 	TlsSkipVerify bool   `json:"tlsSkipVerify"`
 }
