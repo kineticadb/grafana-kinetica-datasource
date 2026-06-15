@@ -39,19 +39,19 @@ export function ConfigEditor(props: Props) {
 
   return (
     <div className={styles.container}>
-      <InlineField label="URL" labelWidth={12}>
+      <InlineField label="URL" labelWidth={20}>
         <Input value={jsonData.url || ''}
         onChange={(e) => onDataChange('url', e.currentTarget.value)}
         placeholder="http://<host>:9191"
         width={40}/>
       </InlineField>
-      <InlineField label="User" labelWidth={12}>
-        <Input value={jsonData.username || ''} onChange={(e) => onDataChange('username', e.currentTarget.value)} width={20}/>
+      <InlineField label="User" labelWidth={20}>
+        <Input value={jsonData.username || ''} onChange={(e) => onDataChange('username', e.currentTarget.value)} width={32}/>
       </InlineField>
-      <InlineField label="Password" labelWidth={12}>
-        <SecretInput isConfigured={Boolean(secureJsonFields?.password)} value={secureJsonData.password || ''} onReset={onResetPassword} onChange={onPasswordChange} width={20}/>
+      <InlineField label="Password" labelWidth={20}>
+        <SecretInput isConfigured={Boolean(secureJsonFields?.password)} value={secureJsonData.password || ''} onReset={onResetPassword} onChange={onPasswordChange} width={32}/>
       </InlineField>
-      <InlineField label="Skip TLS Verify" labelWidth={12} tooltip="Skip TLS certificate verification (insecure, use only for testing)">
+      <InlineField label="Skip TLS Verify" labelWidth={20} tooltip="Skip TLS certificate verification (insecure, use only for testing)">
         <Switch value={jsonData.tlsSkipVerify || false} onChange={(e) => onDataChange('tlsSkipVerify', e.currentTarget.checked)} />
       </InlineField>
     </div>
