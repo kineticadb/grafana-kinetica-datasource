@@ -11,6 +11,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -19,6 +20,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"github.com/hamba/avro/v2"
 	"github.com/kineticadb/kinetica-api-go/kinetica"
+	"golang.org/x/sync/errgroup"
 )
 
 var (
@@ -47,9 +49,36 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
 	response := backend.NewQueryDataResponse()
 
+	// For a single query, skip the overhead of goroutines
+	if len(req.Queries) == 1 {
+		res := d.query(ctx, d.client, req.Queries[0])
+		response.Responses[req.Queries[0].RefID] = res
+		return response, nil
+	}
+
+	// Run multiple queries concurrently using errgroup
+	g, gCtx := errgroup.WithContext(ctx)
+	var mu sync.Mutex
+	results := make(map[string]backend.DataResponse)
+
 	for _, q := range req.Queries {
-		res := d.query(ctx, d.client, q)
-		response.Responses[q.RefID] = res
+		// Capture loop variable for goroutine
+		query := q
+		g.Go(func() error {
+			res := d.query(gCtx, d.client, query)
+			mu.Lock()
+			results[query.RefID] = res
+			mu.Unlock()
+			return nil // Don't propagate errors to cancel other queries
+		})
+	}
+
+	// Wait for all queries to complete
+	_ = g.Wait()
+
+	// Collect results
+	for refID, res := range results {
+		response.Responses[refID] = res
 	}
 
 	return response, nil

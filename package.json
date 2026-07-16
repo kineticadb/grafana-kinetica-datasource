@@ -16,7 +16,7 @@
     "postinstall": "rm -rf node_modules/flatted/golang || true"
   },
   "author": "Kinetica",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "devDependencies": {
     "@grafana/eslint-config": "^9.0.0",
     "@grafana/plugin-e2e": "^3.0.1",

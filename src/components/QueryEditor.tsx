@@ -147,6 +147,43 @@ const getStyles = (theme: GrafanaTheme2) => ({
   logicSpacerSmall: css`
     width: 80px;
   `,
+  // Additional styles to replace inline styles
+  alertMargin: css`
+    margin-bottom: ${theme.spacing(1.25)};
+  `,
+  flexGrow: css`
+    flex-grow: 1;
+  `,
+  sectionMargin: css`
+    margin-bottom: ${theme.spacing(2)};
+  `,
+  fieldNoMargin: css`
+    margin-bottom: 0;
+  `,
+  iconButtonTopMargin: css`
+    margin-top: ${theme.spacing(2.75)};
+  `,
+  iconButtonNoMargin: css`
+    margin-top: 0;
+  `,
+  joinOperator: css`
+    font-weight: ${theme.typography.fontWeightBold};
+  `,
+  addConditionButton: css`
+    margin-top: ${theme.spacing(0.5)};
+  `,
+  groupByRow: css`
+    display: flex;
+    gap: ${theme.spacing(1.25)};
+    align-items: flex-end;
+    margin-bottom: ${theme.spacing(2)};
+  `,
+  orderBySection: css`
+    margin-top: ${theme.spacing(1.25)};
+  `,
+  setOpAddButton: css`
+    margin-top: ${theme.spacing(1.25)};
+  `,
 });
 
 // -----------------------------------------------------------------------------
@@ -164,18 +201,24 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const [schemaOptions, setSchemaOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [tableOptions, setTableOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [allColumnOptions, setAllColumnOptions] = useState<RichColumnOption[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
     datasource.getSchemas()
-      .then((s) => {
-        if (isMounted && Array.isArray(s)) {
-          setSchemaOptions(s.map((v) => ({ label: v, value: v })));
+      .then((result) => {
+        if (isMounted) {
+          setSchemaOptions(result.data.map((v) => ({ label: v, value: v })));
+          if (result.error) {
+            setFetchError(result.error);
+          }
         }
       })
       .catch((err) => {
-        console.error('Failed to fetch schemas:', err);
-        if (isMounted) { setSchemaOptions([]); }
+        if (isMounted) {
+          setSchemaOptions([]);
+          setFetchError(`Failed to fetch schemas: ${err instanceof Error ? err.message : String(err)}`);
+        }
       });
     return () => { isMounted = false; };
   }, [datasource]);
@@ -184,19 +227,24 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
     let isMounted = true;
     if (builder.schema) {
       datasource.getTableNames(builder.schema)
-        .then((t) => {
-          if (isMounted && Array.isArray(t)) {
+        .then((result) => {
+          if (isMounted) {
             const prefix = `${builder.schema}.`;
-            const cleanOptions = t.map((v) => {
+            const cleanOptions = result.data.map((v) => {
                const label = v.startsWith(prefix) ? v.substring(prefix.length) : v;
                return { label: label, value: v };
             });
             setTableOptions(cleanOptions);
+            if (result.error) {
+              setFetchError(result.error);
+            }
           }
         })
         .catch((err) => {
-          console.error('Failed to fetch tables:', err);
-          if (isMounted) { setTableOptions([]); }
+          if (isMounted) {
+            setTableOptions([]);
+            setFetchError(`Failed to fetch tables: ${err instanceof Error ? err.message : String(err)}`);
+          }
         });
     }
     return () => { isMounted = false; };
@@ -239,14 +287,18 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
         if (sources.length === 0) { if (isMounted) {setAllColumnOptions([]);} return; }
         try {
             const results = await Promise.all(sources.map(async (src) => {
-                const cols = await datasource.getColumns(src.schema, src.table);
-                if (!Array.isArray(cols)) { return []; }
-                return cols.map(c => ({ label: `${src.alias}.${c}`, value: `${src.alias}.${c}`, rawColumn: c, rawTableAlias: src.alias, sourceIndex: src.index }));
+                const result = await datasource.getColumns(src.schema, src.table);
+                if (result.error && isMounted) {
+                    setFetchError(result.error);
+                }
+                return result.data.map(c => ({ label: `${src.alias}.${c}`, value: `${src.alias}.${c}`, rawColumn: c, rawTableAlias: src.alias, sourceIndex: src.index }));
             }));
             if (isMounted) {setAllColumnOptions(results.flat());}
         } catch (err) {
-            console.error('Failed to fetch columns:', err);
-            if (isMounted) { setAllColumnOptions([]); }
+            if (isMounted) {
+                setAllColumnOptions([]);
+                setFetchError(`Failed to fetch columns: ${err instanceof Error ? err.message : String(err)}`);
+            }
         }
     };
     fetchAllColumns();
@@ -370,36 +422,43 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const SORT_DIRS = ['ASC', 'DESC'].map(t => ({ label: t, value: t }));
   const SET_OPS = ['UNION', 'UNION ALL', 'INTERSECT', 'INTERSECT ALL', 'EXCEPT', 'EXCEPT ALL'].map(t => ({ label: t, value: t }));
 
+  const clearFetchError = () => setFetchError(null);
+
   return (
     <div className={styles.builderContainer}>
       {isRoot && <h5 className={styles.builderTitle}>SQL Builder</h5>}
-      {aliasError && <Alert title="Validation Error" severity="error" style={{marginBottom: 10}}>{String(aliasError)}</Alert>}
+      {fetchError && (
+        <Alert title="Connection Error" severity="warning" className={styles.alertMargin} onRemove={clearFetchError}>
+          {fetchError}
+        </Alert>
+      )}
+      {aliasError && <Alert title="Validation Error" severity="error" className={styles.alertMargin}>{String(aliasError)}</Alert>}
 
       <Stack direction="row" gap={1}>
         <Field label="Schema"><Combobox options={schemaOptions} value={builder.schema || null} onChange={v => onSchemaChange(v?.value ?? '')} width={25} /></Field>
-        <div style={{ flexGrow: 1 }}><Field label="Table"><Combobox options={tableOptions} value={builder.table || null} onChange={v => onTableChange(v?.value ?? '')} /></Field></div>
+        <div className={styles.flexGrow}><Field label="Table"><Combobox options={tableOptions} value={builder.table || null} onChange={v => onTableChange(v?.value ?? '')} /></Field></div>
         <Field label="Alias"><Input value={builder.alias || ''} onChange={e => update('alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
         <Field label="Distinct"><Switch value={builder.distinct ?? false} onChange={e => update('distinct', e.currentTarget.checked)} /></Field>
       </Stack>
 
       {/* SELECT COLS */}
-      <div style={{ marginBottom: 15 }}>
+      <div className={styles.sectionMargin}>
         <h6 className={styles.sectionTitle}>Selected Columns</h6>
         {builder.selects?.map((s, i) => (
             <div key={i} className={styles.selectRow}>
                 <Stack direction="row" gap={1}>
-                    <Field label={i===0?"Aggregate":""} style={{marginBottom:0}}>
+                    <Field label={i===0?"Aggregate":""} className={styles.fieldNoMargin}>
                         <Combobox options={AGG_FUNCS} value={s.aggregate || null} onChange={v => updateSelect(i, 'aggregate', (v?.value === '' || v?.value === undefined) ? undefined : v.value)} width={24} placeholder="Func" />
                     </Field>
-                    <div style={{flexGrow: 1}}>
-                         <Field label={i===0?"Column":""} style={{marginBottom:0}}>
+                    <div className={styles.flexGrow}>
+                         <Field label={i===0?"Column":""} className={styles.fieldNoMargin}>
                             <Combobox options={allColumnOptions} value={s.table ? `${s.table}.${s.column}` : (s.column || null)} onChange={v => updateSelect(i, 'column', v?.value)} />
                          </Field>
                     </div>
-                    <Field label={i===0?"Alias":""} style={{marginBottom:0}}>
+                    <Field label={i===0?"Alias":""} className={styles.fieldNoMargin}>
                         <Input value={s.alias || ''} onChange={e => updateSelect(i, 'alias', e.currentTarget.value)} width={16} placeholder="Alias" />
                     </Field>
-                    <div style={{marginTop: i===0?22:0}}>
+                    <div className={i===0 ? styles.iconButtonTopMargin : styles.iconButtonNoMargin}>
                         <Stack direction="row" gap={0.5}>
                             <IconButton name="arrow-up" size="sm" variant="secondary" aria-label="Move Up" disabled={i===0} onClick={() => moveSelect(i, -1)} />
                             <IconButton name="arrow-down" size="sm" variant="secondary" aria-label="Move Down" disabled={i===(builder.selects?.length||0)-1} onClick={() => moveSelect(i, 1)} />
@@ -421,9 +480,9 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             <div key={i} className={styles.joinContainer}>
               <Stack direction="row" gap={1}>
                 <Field label={i === 0 ? 'Type' : ''}><Combobox options={JOIN_TYPES} value={j.type || null} onChange={v => updateJoin(i, 'type', v?.value)} width={20} /></Field>
-                <div style={{ flexGrow: 1 }}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} /></Field></div>
+                <div className={styles.flexGrow}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} /></Field></div>
                 <Field label={i === 0 ? 'Alias' : ''}><Input value={j.alias || ''} onChange={e => updateJoin(i, 'alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
-                <div style={{ marginTop: i === 0 ? 22 : 0 }}><IconButton name="trash-alt" variant="secondary" aria-label="Remove Join" onClick={() => removeJoin(i)} /></div>
+                <div className={i === 0 ? styles.iconButtonTopMargin : styles.iconButtonNoMargin}><IconButton name="trash-alt" variant="secondary" aria-label="Remove Join" onClick={() => removeJoin(i)} /></div>
               </Stack>
 
               <div className={styles.joinConditionsContainer}>
@@ -439,17 +498,17 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
                           {condIdx === 0 && <div className={styles.logicSpacerSmall}></div>}
 
                           <Combobox options={leftOptions} placeholder="Left" value={cond.left || null} onChange={v => updateJoinCondition(i, condIdx, 'left', v?.value ?? '')} />
-                          <div style={{ fontWeight: 'bold' }}>=</div>
+                          <div className={styles.joinOperator}>=</div>
                           <Combobox options={rightOptions} placeholder="Right" value={cond.right || null} onChange={v => updateJoinCondition(i, condIdx, 'right', v?.value ?? '')} />
                           <IconButton name="trash-alt" size="sm" variant="secondary" aria-label="Remove Condition" onClick={() => removeJoinCondition(i, condIdx)} />
                       </Stack>
                   ))}
-                  <Button size="xs" variant="secondary" icon="plus" style={{marginTop:5}} onClick={() => addJoinCondition(i)}>Add Condition</Button>
+                  <Button size="xs" variant="secondary" icon="plus" className={styles.addConditionButton} onClick={() => addJoinCondition(i)}>Add Condition</Button>
               </div>
             </div>
           );
       })}
-      <div style={{ marginBottom: 15 }}><Button size="sm" variant="secondary" icon="plus" onClick={addJoin}>Add Join</Button></div>
+      <div className={styles.sectionMargin}><Button size="sm" variant="secondary" icon="plus" onClick={addJoin}>Add Join</Button></div>
 
       {/* WHERE */}
       {builder.filters?.map((f, i) => (
@@ -459,22 +518,22 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             {i === 0 && <div className={styles.logicSpacer}></div>}
             <Combobox options={allColumnOptions} value={f.key || null} onChange={v => updateFilterList('filters', i, 'key', v?.value)} width={20} />
             <Input value={f.operator || ''} onChange={e => updateFilterList('filters', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
-            <div style={{ flexGrow: 1 }}><Input value={f.value || ''} onChange={e => updateFilterList('filters', i, 'value', e.currentTarget.value)} placeholder="value" /></div>
+            <div className={styles.flexGrow}><Input value={f.value || ''} onChange={e => updateFilterList('filters', i, 'value', e.currentTarget.value)} placeholder="value" /></div>
             <IconButton name="trash-alt" variant="secondary" aria-label="Remove Filter" onClick={() => removeFilterList('filters', i)} />
           </Stack>
         </div>
       ))}
-      <div style={{ marginBottom: 15 }}>
+      <div className={styles.sectionMargin}>
         <Stack direction="row" gap={2}>
           <Button size="sm" variant="secondary" icon="plus" onClick={() => addFilterList('filters')}>Add Filter</Button>
-          <div style={{ flexGrow: 0 }}><Field label="Time Column" style={{ marginBottom: 0 }}><Combobox options={allColumnOptions} value={builder.timeColumn || null} onChange={v => update('timeColumn', v?.value)} width={20} /></Field></div>
+          <Field label="Time Column" className={styles.fieldNoMargin}><Combobox options={allColumnOptions} value={builder.timeColumn || null} onChange={v => update('timeColumn', v?.value)} width={20} /></Field>
         </Stack>
       </div>
 
       {/* GROUP / HAVING / ORDER / LIMIT */}
       <div className={styles.groupSection}>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'flex-end', marginBottom: 15 }}>
-           <div style={{ flexGrow: 1 }}>
+        <div className={styles.groupByRow}>
+           <div className={styles.flexGrow}>
              <Field label="Group By"><MultiCombobox options={combinedOptions} value={(builder.groupBy || []).map((c) => ({ label: c, value: c }))} onChange={v => update('groupBy', v.map((i) => i.value!))} /></Field>
            </div>
            <Field label="Limit"><Input type="number" value={builder.limit !== undefined ? builder.limit : 1000} onChange={e => update('limit', parseInt(e.currentTarget.value, 10) || 1000)} width={10} /></Field>
@@ -490,7 +549,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
                   {i === 0 && <div className={styles.logicSpacer}></div>}
                   <Combobox options={combinedOptions} value={f.key || null} onChange={v => updateFilterList('having', i, 'key', v?.value)} width={20} />
                   <Input value={f.operator || ''} onChange={e => updateFilterList('having', i, 'operator', e.currentTarget.value)} placeholder="operator" width={12} />
-                  <Input value={f.value || ''} onChange={e => updateFilterList('having', i, 'value', e.currentTarget.value)} style={{flexGrow: 1}} placeholder="value" />
+                  <Input value={f.value || ''} onChange={e => updateFilterList('having', i, 'value', e.currentTarget.value)} className={styles.flexGrow} placeholder="value" />
                   <IconButton name="trash-alt" variant="secondary" aria-label="Remove Having" onClick={() => removeFilterList('having', i)} />
                 </Stack>
               </div>
@@ -499,7 +558,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
           </div>
         )}
 
-        <div style={{ marginTop: 10 }}>
+        <div className={styles.orderBySection}>
           <h6 className={styles.sectionTitle}>Order By</h6>
           {builder.orderBy?.map((o, i) => (
              <div key={i} className={styles.orderByRow}>
@@ -529,7 +588,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
           </div>
         </div>
       ))}
-      <div style={{ marginTop: 10 }}>
+      <div className={styles.setOpAddButton}>
         <Button variant="secondary" icon="plus" onClick={addSetOp}>Add Set Operation</Button>
       </div>
     </div>
@@ -593,7 +652,7 @@ export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) 
     <div>
       <div className={styles.editorHeader}>
         {!isRawSql && <Button variant="secondary" size="sm" onClick={onReset}>Reset</Button>}
-        <Field label="Raw SQL Mode" style={{marginBottom: 0}}><Switch value={isRawSql} onChange={() => setIsRawSql(!isRawSql)} /></Field>
+        <Field label="Raw SQL Mode" className={styles.fieldNoMargin}><Switch value={isRawSql} onChange={() => setIsRawSql(!isRawSql)} /></Field>
       </div>
       {isRawSql ? (
         <div className={styles.rawSqlContainer}>

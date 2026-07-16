@@ -10,11 +10,16 @@ const cleanName = (name: string) => {
 // Helper: Smart Quoting
 const quoteId = (val: string) => {
     if (!val) {return '';}
-    if (val.startsWith('"') || val.startsWith("'") || !isNaN(parseFloat(val))) {return val;} 
+    if (val.startsWith('"') || val.startsWith("'") || !isNaN(parseFloat(val))) {return val;}
     if (val.includes('.')) {
         return val.split('.').map(p => `"${p}"`).join('.');
     }
     return `"${val}"`;
+};
+
+// Helper: Escape single quotes in string values for SQL
+const escapeStringValue = (val: string): string => {
+    return val.replace(/'/g, "''");
 };
 
 function generateSingleSelect(builder: KineticaQueryBuilder): string {
@@ -131,7 +136,7 @@ function generateSingleSelect(builder: KineticaQueryBuilder): string {
       filters.forEach((f, i) => {
         if (f.key && f.operator && f.value) {
           const isNumber = !isNaN(parseFloat(f.value));
-          const val = isNumber ? f.value : `'${f.value}'`;
+          const val = isNumber ? f.value : `'${escapeStringValue(f.value)}'`;
           const quotedKey = quoteId(resolveAlias(f.key));
           
           let logic = 'AND';

@@ -5,6 +5,12 @@ import { map } from 'rxjs/operators';
 
 import { KineticaDataSourceOptions, KineticaQuery, defaultQuery } from './types';
 
+// Result type for resource fetches that includes error information
+export interface ResourceFetchResult<T> {
+  data: T;
+  error?: string;
+}
+
 export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<KineticaDataSourceOptions>) {
     super(instanceSettings);
@@ -90,40 +96,63 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
     );
   }
 
+  // Helper to extract error message from various error types
+  private extractErrorMessage(err: unknown): string {
+    if (err instanceof Error) {
+      return err.message;
+    }
+    if (typeof err === 'object' && err !== null) {
+      const errObj = err as Record<string, unknown>;
+      if (typeof errObj.message === 'string') {
+        return errObj.message;
+      }
+      if (typeof errObj.statusText === 'string') {
+        return errObj.statusText;
+      }
+      if (typeof errObj.data === 'object' && errObj.data !== null) {
+        const data = errObj.data as Record<string, unknown>;
+        if (typeof data.message === 'string') {
+          return data.message;
+        }
+      }
+    }
+    return String(err);
+  }
+
   // 1. Get Schemas
-  async getSchemas(): Promise<string[]> {
+  async getSchemas(): Promise<ResourceFetchResult<string[]>> {
     try {
       const result = await this.getResource('schemas');
-      return Array.isArray(result) ? result : [];
+      return { data: Array.isArray(result) ? result : [] };
     } catch (err) {
-      console.error('Failed to fetch schemas:', err);
-      return [];
+      const errorMessage = this.extractErrorMessage(err);
+      return { data: [], error: `Failed to fetch schemas: ${errorMessage}` };
     }
   }
 
   // 2. Get Tables
-  async getTableNames(schema?: string): Promise<string[]> {
+  async getTableNames(schema?: string): Promise<ResourceFetchResult<string[]>> {
     try {
       const result = await this.getResource('tables', { schema });
-      return Array.isArray(result) ? result : [];
+      return { data: Array.isArray(result) ? result : [] };
     } catch (err) {
-      console.error('Failed to fetch tables:', err);
-      return [];
+      const errorMessage = this.extractErrorMessage(err);
+      return { data: [], error: `Failed to fetch tables: ${errorMessage}` };
     }
   }
 
   // 3. Get Columns
-  async getColumns(schema: string | undefined, tableName: string): Promise<string[]> {
+  async getColumns(schema: string | undefined, tableName: string): Promise<ResourceFetchResult<string[]>> {
     try {
-      const params: any = { table: tableName };
+      const params: Record<string, string> = { table: tableName };
       if (schema) {
         params.schema = schema;
       }
       const result = await this.getResource('columns', params);
-      return Array.isArray(result) ? result : [];
+      return { data: Array.isArray(result) ? result : [] };
     } catch (err) {
-      console.error('Failed to fetch columns:', err);
-      return [];
+      const errorMessage = this.extractErrorMessage(err);
+      return { data: [], error: `Failed to fetch columns: ${errorMessage}` };
     }
   }
 }
