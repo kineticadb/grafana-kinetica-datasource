@@ -4,6 +4,8 @@
 **Package**: kinetica-grafana-datasource-1.0.0.zip
 **Status**: ✅ READY FOR GRAFANA SUBMISSION
 
+> **Status update (2026-07-27):** This is a point-in-time verification record for the 1.0.0 submission package, kept for history. The plugin has since been **published and signed**. It is live in the Grafana catalog as [`kinetica-grafana-datasource`](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/) (status `active`, catalog version 1.0.7), and release archives carry a commercial signature issued to the `kinetica` organization (`MANIFEST.txt`, PGP/SHA512, key `7e4d0c6a708866e7`). Signing runs in `.github/workflows/release.yml` via `policy_token` + `attestation: true`. The unsigned findings below are **resolved**.
+
 ## Package Details
 
 - **File**: `kinetica-grafana-datasource-1.0.0.zip`
@@ -136,11 +138,11 @@ kinetica-grafana-datasource-1.0.0.zip
 #### ⚠️ unsigned-plugin
 **Warning**: unsigned plugin
 
-**Status**: Expected for first submission
+**Status**: ✅ **RESOLVED** (2026-07-27) — all three steps below completed; releases are signed as of v1.0.7 with a commercial signature issued to the `kinetica` organization.
 **Next Steps**:
-1. Await Grafana Labs approval
-2. Generate signing token
-3. Re-release with signature
+1. ✅ Await Grafana Labs approval — published to the catalog, status `active`
+2. ✅ Generate signing token — `GRAFANA_ACCESS_POLICY_TOKEN` configured as a repository secret
+3. ✅ Re-release with signature — v1.0.7 ships a signed `MANIFEST.txt`
 
 **Infrastructure Ready**:
 - ✅ Access policy token configured in workflows

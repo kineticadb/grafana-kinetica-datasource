@@ -3,6 +3,8 @@
 **Date**: 2026-04-17
 **Issue**: Release workflow failing with multiple errors
 
+> **Status update (2026-07-27):** This is a point-in-time troubleshooting record, kept for history. The plugin has since been **published and signed**. It is live in the Grafana catalog as [`kinetica-grafana-datasource`](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/) (status `active`, catalog version 1.0.7), and release archives carry a commercial signature issued to the `kinetica` organization (`MANIFEST.txt`, PGP/SHA512, key `7e4d0c6a708866e7`). Signing runs in `.github/workflows/release.yml` via `policy_token` + `attestation: true`. The unsigned-plugin warnings below no longer apply.
+
 ---
 
 ## Critical Errors (Must Fix)
@@ -252,7 +254,7 @@ git push origin v1.0.1
 - ✅ Plugin structure validates correctly
 
 ### What Will Still Warn (Non-blocking):
-- ⚠️ Unsigned plugin (expected for new/unpublished plugins)
+- ~~⚠️ Unsigned plugin (expected for new/unpublished plugins)~~ — no longer applies; releases are signed as of v1.0.7
 - ⚠️ Plugin ID format (if we choose not to change it)
 - ⚠️ Screenshots (if not added)
 
@@ -270,7 +272,7 @@ git push origin v1.0.1
 5. ⚠️ Screenshots
 
 **CAN IGNORE:**
-6. ℹ️ Unsigned plugin (handled during Grafana review)
+6. ~~ℹ️ Unsigned plugin (handled during Grafana review)~~ — ✅ done; signed as of v1.0.7
 
 ---
 

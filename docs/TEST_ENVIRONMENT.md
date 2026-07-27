@@ -16,7 +16,7 @@ A properly configured test environment accelerates plugin review and helps users
 
 - Docker and Docker Compose
 - Node.js >= 22
-- Go >= 1.22 (for backend)
+- Go 1.26.x (for backend; must match the `go` directive in `go.mod`)
 - Access to a Kinetica database
 
 ### 2. Clone and Build

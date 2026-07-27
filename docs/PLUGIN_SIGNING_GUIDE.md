@@ -95,7 +95,7 @@ The workflows are already configured to use the token:
 ```yaml
 - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
   with:
-    go-version: '1.25'
+    go-version: '1.26'
     policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
 ```
 

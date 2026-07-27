@@ -4,6 +4,8 @@
 **Plugin**: kinetica-grafana-datasource
 **Version**: 1.0.0
 
+> **Status update (2026-07-27):** This is a point-in-time submission record, kept for history. The plugin has since been **published and signed**. It is live in the Grafana catalog as [`kinetica-grafana-datasource`](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/) (status `active`, catalog version 1.0.7), and release archives carry a commercial signature issued to the `kinetica` organization (`MANIFEST.txt`, PGP/SHA512, key `7e4d0c6a708866e7`). Signing runs in `.github/workflows/release.yml` via `policy_token` + `attestation: true`. The unsigned/unpublished findings below are **resolved**.
+
 ## Issues Reported
 
 ### ❌ invalid-id-format (CRITICAL - BLOCKER)
@@ -60,7 +62,7 @@ We will add screenshots in the next submission update showing:
 ### ⚠️ unsigned-plugin (WARNING - EXPECTED)
 **Warning**: unsigned plugin
 
-**Status**: ✅ **EXPECTED FOR FIRST SUBMISSION**
+**Status**: ✅ **RESOLVED** (2026-07-27) — releases are signed as of v1.0.7. Originally logged as "expected for first submission"; the predicted sequence below completed as described.
 
 **Details**:
 - This is normal for initial plugin submissions
@@ -117,7 +119,7 @@ The `build-plugin` action automatically handles provenance attestation when publ
 
 ### Warnings Acknowledged:
 - ⚠️ Screenshots: Will add in next update (cosmetic improvement)
-- ⚠️ Unsigned: Expected for first submission
+- ⚠️ Unsigned: Expected for first submission — ✅ resolved, signed as of v1.0.7
 - 💡 Suggestions: Noted for future consideration
 
 ## Files Ready for Resubmission
