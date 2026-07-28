@@ -20,9 +20,23 @@ version numbers here are not contiguous.
   error from a dependency (for example `Array.prototype.toSorted` being undefined on
   Node 18).
 
+### Changed
+- `github.com/grafana/grafana-plugin-sdk-go` -> v0.294.0 (from v0.292.1).
+- **Minimum Go toolchain for building from source is now 1.26.5** (was 1.26.3). The
+  `go` directive in `go.mod` was raised because the Grafana Go SDK from v0.293.0
+  onwards declares `go 1.26.5`. CI is unaffected — the workflows pin
+  `go-version: '1.26'`, which resolves to the latest 1.26.x.
+
 ### Fixed
+- The release workflow now pins `node-version: '22'` for
+  `grafana/plugin-actions/build-plugin`. The action defaults to Node 20, so release
+  builds were running on a Node version that `package.json` `engines` declares
+  unsupported (`>=22`), previously surfacing only as an `EBADENGINE` warning. With
+  `engine-strict=true` now in `.npmrc`, that warning would have become a hard
+  `npm install` failure in the release build.
 - Security issues (Go)
-  - `GO-2026-5841`:  `github.com/klauspost/compress` -> v1.18.7
+  - `GO-2026-5841`:  `github.com/klauspost/compress` -> v1.19.0
+    (fixed as of v1.18.7; resolved to v1.19.0 by the SDK upgrade above)
   - `GO-2026-5970`:  `golang.org/x/text` -> v0.39.0
 
 ### Known limitations
