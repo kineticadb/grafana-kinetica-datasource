@@ -28,6 +28,10 @@ jobs:
 
       - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
         with:
+          # These pins are load-bearing: the action defaults to go 1.25 / node 20,
+          # which cannot build this plugin (go.mod requires 1.26.x, package.json
+          # engines requires node >=22 and .npmrc sets engine-strict).
           go-version: '1.26'
+          node-version: '22'
           policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
           attestation: true
