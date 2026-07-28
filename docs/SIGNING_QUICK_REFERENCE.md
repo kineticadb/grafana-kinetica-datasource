@@ -55,14 +55,18 @@ Or navigate: Repository → Settings → Secrets and variables → Actions
 
 ## Step 3: Test It Works
 
-### Option A: Test in CI (Push any commit)
+### Option A: Test in CI (push a version tag)
+
+Signing only runs on a version tag push, not on a branch push — CI does no signing.
+
 ```bash
-git add .
-git commit -m "test: verify plugin signing"
-git push origin master
+git tag v1.2.3
+git push origin v1.2.3
 ```
 
-**Check**: GitHub Actions → "Sign plugin" step should show ✅
+**Check**: GitHub Actions → **Release** workflow → the
+`Run grafana/plugin-actions/build-plugin@build-plugin/v1.0.2` step should show ✅.
+There is no separate "Sign plugin" step; signing happens inside that action.
 
 ### Option B: Test Locally (Optional)
 ```bash
@@ -170,19 +174,17 @@ dist/
 ## Your Workflows (Already Configured ✅)
 
 ### .github/workflows/ci.yml
-```yaml
-- name: Sign plugin
-  run: npm run sign
-  if: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN != '' }}
-  env:
-    GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
-```
+
+No signing. CI builds, tests, and validates `plugin.json` only.
 
 ### .github/workflows/release.yml
 ```yaml
 - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
   with:
+    go-version: '1.26'
+    node-version: '22'
     policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+    attestation: true
 ```
 
 **No code changes needed!** Just add the token to GitHub Secrets.

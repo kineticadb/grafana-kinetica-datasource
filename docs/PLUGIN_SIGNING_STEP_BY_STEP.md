@@ -124,12 +124,12 @@ This enables automatic signing in your CI/CD workflows.
 
 ### 3.1 Navigate to Repository Secrets
 
-1. **Go to**: https://github.com/kineticadb/kinetica-grafana-datasource
+1. **Go to**: https://github.com/kineticadb/grafana-kinetica-datasource
 2. **Click**: "Settings" tab (top menu bar)
 3. **Click**: "Secrets and variables" in left sidebar
 4. **Click**: "Actions" (dropdown item)
 
-**Direct URL**: https://github.com/kineticadb/kinetica-grafana-datasource/settings/secrets/actions
+**Direct URL**: https://github.com/kineticadb/grafana-kinetica-datasource/settings/secrets/actions
 
 ### 3.2 Create New Repository Secret
 
@@ -165,33 +165,37 @@ Your workflows are already configured to use the token. Let's verify:
 ### 4.1 Check Release Workflow
 
 ```bash
-cat .github/workflows/release.yml | grep -A 3 "policy_token"
+grep -A 8 'build-plugin@build-plugin' .github/workflows/release.yml
 ```
 
 Should show:
 ```yaml
-- uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
-  with:
-    go-version: '1.26'
-    policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+      - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
+        with:
+          # These pins are load-bearing: the action defaults to go 1.25 / node 20,
+          # which cannot build this plugin (go.mod requires 1.26.x, package.json
+          # engines requires node >=22 and .npmrc sets engine-strict).
+          go-version: '1.26'
+          node-version: '22'
+          policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+          attestation: true
 ```
 
 ### 4.2 Check CI Workflow
 
+CI does not sign the plugin — signing runs only in `release.yml` on a version tag
+push. Confirm there is no stray signing step in CI:
+
 ```bash
-cat .github/workflows/ci.yml | grep -A 5 "Sign plugin"
+grep -nE 'sign|policy_token' .github/workflows/ci.yml || echo "no signing in CI (expected)"
 ```
 
 Should show:
-```yaml
-- name: Sign plugin
-  run: npm run sign
-  if: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN != '' }}
-  env:
-    GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+```
+no signing in CI (expected)
 ```
 
-**Result**: ✅ Workflows are properly configured
+**Result**: ✅ Signing is confined to the release workflow
 
 ---
 
@@ -311,19 +315,22 @@ git push origin test/signing-verification
 
 ### 6.2 Monitor GitHub Actions
 
-1. **Go to**: https://github.com/kineticadb/kinetica-grafana-datasource/actions
+1. **Go to**: https://github.com/kineticadb/grafana-kinetica-datasource/actions
 2. **Click**: The running workflow
 3. **Watch**: The "Build, lint and unit tests" job
 
 ### 6.3 Check Signing Step
 
-Find the "Sign plugin" step:
+There is no signing step in CI — signing only happens in the **Release** workflow,
+on a version tag push. Open the Release run for your tag and expand:
+
 ```
-✅ Sign plugin
-   npx --yes @grafana/sign-plugin@latest
-   ℹ Signing manifest for kinetica-grafana-datasource 1.0.0
+✅ Run grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
+   ℹ Signing manifest for kinetica-grafana-datasource <version>
    ℹ Signed successfully
 ```
+
+Signing is internal to that action, so it does not appear as its own named step.
 
 ### 6.4 Verify Artifact Contains MANIFEST.txt
 
@@ -359,24 +366,27 @@ git push origin v1.0.0
 
 ### 7.2 Monitor Release Workflow
 
-1. **Go to**: https://github.com/kineticadb/kinetica-grafana-datasource/actions
+1. **Go to**: https://github.com/kineticadb/grafana-kinetica-datasource/actions
 2. **Find**: "Release" workflow (triggered by tag push)
 3. **Watch**: The workflow progress
 
 **Workflow steps**:
 ```
-✅ Build frontend
-✅ Build backend (6 platforms)
-✅ Sign plugin (with GRAFANA_ACCESS_POLICY_TOKEN)
-✅ Package plugin
-✅ Validate plugin
-✅ Create GitHub release
-✅ Upload signed artifact
+✅ Debug refs
+✅ actions/checkout@v5
+✅ Run grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
+     └─ frontend + backend (6 platforms), osv-scanner, signing with
+        GRAFANA_ACCESS_POLICY_TOKEN, provenance attestation, packaging,
+        and GitHub release creation — all inside this one action
 ```
+
+If the run fails, it is usually this step, and most often osv-scanner rejecting a
+high-severity dependency advisory rather than a signing problem. Check the log for
+`error: osv-scanner detected`.
 
 ### 7.3 Verify Release Artifact
 
-1. **Go to**: https://github.com/kineticadb/kinetica-grafana-datasource/releases
+1. **Go to**: https://github.com/kineticadb/grafana-kinetica-datasource/releases
 2. **Click**: The v1.0.0 release
 3. **Download**: `kinetica-grafana-datasource-1.0.0.zip`
 4. **Extract**: The ZIP file
@@ -622,10 +632,10 @@ Use this checklist when setting up plugin signing:
 - [ ] Check MANIFEST.txt contains all files
 
 ### CI/CD Testing
-- [ ] Push commit to trigger CI workflow
-- [ ] Verify "Sign plugin" step succeeds
+- [ ] Push commit to trigger CI workflow (build/test/validate only — no signing)
+- [ ] Create version tag (e.g., v1.0.0) to trigger the Release workflow
+- [ ] Verify the `build-plugin` step succeeds (this is where signing happens)
 - [ ] Download artifact and check MANIFEST.txt
-- [ ] Create version tag (e.g., v1.0.0)
 - [ ] Verify release workflow succeeds
 - [ ] Download release artifact
 - [ ] Extract and verify MANIFEST.txt in release

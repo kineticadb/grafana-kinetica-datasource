@@ -95,17 +95,23 @@ The workflows are already configured to use the token:
 ```yaml
 - uses: grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
   with:
+    # These pins are load-bearing: the action defaults to go 1.25 / node 20,
+    # which cannot build this plugin (go.mod requires 1.26.x, package.json
+    # engines requires node >=22 and .npmrc sets engine-strict).
     go-version: '1.26'
+    node-version: '22'
     policy_token: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+    attestation: true
 ```
 
 **`.github/workflows/ci.yml`:**
-```yaml
-- name: Sign plugin
-  run: npm run sign
-  if: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN != '' }}
-  env:
-    GRAFANA_ACCESS_POLICY_TOKEN: ${{ secrets.GRAFANA_ACCESS_POLICY_TOKEN }}
+
+CI does **not** sign the plugin. It builds, tests, and validates `plugin.json`, but
+performs no signing — signing happens only in `release.yml` on a version tag push,
+via the `policy_token` input shown above. Confirm with:
+
+```bash
+grep -nE 'sign|policy_token' .github/workflows/ci.yml || echo "no signing in CI (expected)"
 ```
 
 ## How to Sign Locally (Optional)
@@ -284,13 +290,17 @@ npx @grafana/plugin-validator@latest kinetica-datasource-1.0.0.zip
 Once configured, every release will show in GitHub Actions:
 
 ```
-✅ Build frontend
-✅ Build backend (6 platforms)
-✅ Sign plugin (with GRAFANA_ACCESS_POLICY_TOKEN)
-✅ Package plugin
-✅ Validate signature
-✅ Create release
+✅ Debug refs
+✅ actions/checkout@v5
+✅ Run grafana/plugin-actions/build-plugin@build-plugin/v1.0.2
+     └─ builds frontend + backend (6 platforms), runs osv-scanner,
+        signs with GRAFANA_ACCESS_POLICY_TOKEN, emits provenance
+        attestation, packages the archive, and creates the release
 ```
+
+The release workflow is a single action step, not a list of named steps — everything
+above happens inside `build-plugin`. Note that osv-scanner runs there too and **fails
+the release** on high-severity findings.
 
 ## Additional Resources
 

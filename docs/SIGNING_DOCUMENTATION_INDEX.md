@@ -238,10 +238,10 @@ Use this checklist to set up plugin signing:
 - [ ] Verify workflows reference the secret
 
 ### Testing
-- [ ] Push commit to trigger CI
-- [ ] Verify "Sign plugin" step succeeds
+- [ ] Push commit to trigger CI (build/test/validate only — CI does not sign)
+- [ ] Create test tag (e.g., v0.0.1-test) to trigger the Release workflow
+- [ ] Verify the `build-plugin` step succeeds (signing happens inside it)
 - [ ] Download artifact, check MANIFEST.txt exists
-- [ ] Create test tag (e.g., v0.0.1-test)
 - [ ] Verify release includes signed package
 
 ### Validation
@@ -255,10 +255,14 @@ Use this checklist to set up plugin signing:
 
 If you encounter issues not covered in the documentation:
 
-1. **Check logs**: GitHub Actions → Failed workflow → Sign plugin step
+1. **Check logs**: GitHub Actions → failed **Release** run → the
+   `Run grafana/plugin-actions/build-plugin@…` step (signing is inside it; there is
+   no separate "Sign plugin" step). Note that this step also runs osv-scanner, which
+   fails the release on high-severity advisories — a failure here is often a
+   dependency vulnerability rather than a signing problem.
 2. **Verify token**: Grafana Cloud → Access Policies → Check expiration
 3. **Verify secret**: GitHub → Settings → Secrets → Check name spelling
-4. **Review workflow**: `.github/workflows/ci.yml` and `release.yml`
+4. **Review workflow**: `.github/workflows/release.yml` (signing) and `ci.yml` (build/test)
 
 **Official Resources**:
 - [Grafana Plugin Signing Docs](https://grafana.com/developers/plugin-tools/publish-a-plugin/sign-a-plugin)

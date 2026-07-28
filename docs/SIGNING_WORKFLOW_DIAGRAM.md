@@ -97,35 +97,27 @@
        │                     │                      │              │
 
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ STEP 4: CI/CD Automated Signing                                        │
+│ STEP 4: CI on Branch Push (no signing)                                 │
 └─────────────────────────────────────────────────────────────────────────┘
 
-    Push Code         GitHub Actions          Signing Service     Release
-       │                     │                      │              │
-       │   git push          │                      │              │
-       ├────────────────────>│                      │              │
-       │                     │                      │              │
-       │                     │  ┌─ Install deps     │              │
-       │                     │  ├─ Run tests        │              │
-       │                     │  ├─ Build frontend   │              │
-       │                     │  └─ Build backend    │              │
-       │                     │                      │              │
-       │                     │  Sign plugin step:   │              │
-       │                     ├─────────────────────>│              │
-       │                     │  Uses:               │              │
-       │                     │  GRAFANA_ACCESS_     │              │
-       │                     │  POLICY_TOKEN        │              │
-       │                     │                      │              │
-       │                     │  Creates MANIFEST    │              │
-       │                     │<─────────────────────┤              │
-       │                     │                      │              │
-       │                     │  Package plugin      │              │
-       │                     ├──────────────────────┼─────────────>│
-       │                     │                      │  Signed ZIP  │
-       │                     │                      │              │
-       │   ✅ CI Passed      │                      │              │
-       │<────────────────────┤                      │              │
-       │                     │                      │              │
+    Push Code         GitHub Actions
+       │                     │
+       │   git push          │
+       ├────────────────────>│
+       │                     │
+       │                     │  ┌─ Install deps
+       │                     │  ├─ Typecheck / lint / unit tests
+       │                     │  ├─ Build frontend
+       │                     │  ├─ Build backend (mage)
+       │                     │  └─ Validate plugin.json
+       │                     │
+       │   ✅ CI Passed      │
+       │<────────────────────┤
+       │                     │
+
+    CI does not sign. No MANIFEST.txt is produced here and the
+    GRAFANA_ACCESS_POLICY_TOKEN is not used. Signing happens only on a
+    version tag push — see STEP 5.
 
 ┌─────────────────────────────────────────────────────────────────────────┐
 │ STEP 5: Release Workflow                                               │
@@ -140,9 +132,12 @@
        │                     │  Trigger release     │              │
        │                     │  workflow            │              │
        │                     │                      │              │
+       │                     │  build-plugin action:│              │
        │                     │  ┌─ Build all        │              │
        │                     │  ├─ Run tests        │              │
+       │                     │  ├─ osv-scanner gate │              │
        │                     │  ├─ Sign plugin      │              │
+       │                     │  ├─ Provenance attn. │              │
        │                     │  ├─ Package ZIP      │              │
        │                     │  └─ Validate         │              │
        │                     │                      │              │
@@ -150,7 +145,7 @@
        │                     ├──────────────────────┼─────────────>│
        │                     │                      │   Artifacts: │
        │                     │                      │   - .zip     │
-       │                     │                      │   - .sha256  │
+       │                     │                      │   - .zip.sha1│
        │   ✅ Release v1.0.0 │                      │              │
        │<────────────────────┴──────────────────────┴──────────────┤
        │                                                            │
