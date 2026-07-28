@@ -1,8 +1,8 @@
 module github.com/kinetica/datasource
 
-go 1.26.3
+go 1.26.5
 
-require github.com/grafana/grafana-plugin-sdk-go v0.292.1
+require github.com/grafana/grafana-plugin-sdk-go v0.294.0
 
 require (
 	github.com/hamba/avro/v2 v2.31.0
@@ -44,7 +44,7 @@ require (
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/jaegertracing/jaeger-idl v0.9.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/klauspost/compress v1.18.7 // indirect
+	github.com/klauspost/compress v1.19.0 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/magefile/mage v1.17.2 // indirect
 	github.com/mattetti/filebuffer v1.0.1 // indirect
