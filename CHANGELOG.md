@@ -5,6 +5,43 @@ All notable changes to the Kinetica Grafana Datasource Plugin will be documented
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+This file documents the versions published to the
+[Grafana plugin catalog](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/).
+Intermediate tags and GitHub releases used during development are not listed, so the
+version numbers here are not contiguous.
+
+
+## [1.0.9] - 2026-07-28 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.9
+
+### Added
+- `.npmrc` sets `engine-strict=true`, so `npm install` fails immediately when the
+  active Node version does not satisfy the `engines` field in `package.json`.
+  Previously npm only warned, and the mismatch surfaced later as a confusing runtime
+  error from a dependency (for example `Array.prototype.toSorted` being undefined on
+  Node 18).
+
+### Fixed
+- Security issues (Go)
+  - `GO-2026-5841`:  `github.com/klauspost/compress` -> v1.18.7
+  - `GO-2026-5970`:  `golang.org/x/text` -> v0.39.0
+
+### Known limitations
+- Three advisories against `github.com/hamba/avro/v2` remain open: `GO-2026-5046`
+  (CPU exhaustion), `GO-2026-5047` (integer overflow), and `GO-2026-5048` (denial of
+  service via unbounded map allocations). No fixed version exists — upstream has not
+  released past v2.31.0, and the `2.33.0` fix referenced by these advisories applies
+  to a fork (`github.com/iskorotkov/avro/v2`), not to this dependency. The affected
+  decoder is reachable from the query path, so the mitigating factor is that the Avro
+  input is the response from the configured Kinetica server rather than untrusted
+  data; the impact would be denial of service in the plugin backend process. Tracking
+  upstream for a release.
+- Remaining `npm audit` findings resolve to `@grafana/ui`, `@grafana/data`, and
+  `@grafana/runtime`, which are webpack externals supplied by the Grafana host at
+  runtime, plus jest/eslint build tooling. None of that code is bundled into the
+  shipped `dist/module.js`. Fixing them requires major upgrades of the `@grafana/*`
+  packages to 13.x, which would raise the minimum supported Grafana version beyond
+  the declared `>=12.3.0`.
+
 
 ## [1.0.8] - 2026-07-27 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.8
 
@@ -38,13 +75,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the schema, table, and column dropdowns simply rendered empty, giving no
   indication that the datasource was unreachable.
 - Replaced an `any`-typed parameter object in `getColumns` with `Record<string, string>`.
+- Security issues (Go)
+  - `GO-2026-6061` / `GHSA-hrxh-6v49-42gf`:  `google.golang.org/grpc` -> v1.82.1
+    (xDS RBAC authorization engine and HTTP/2 transport server vulnerabilities)
+- Security issues (npm, lockfile only — no declared dependency ranges changed)
+  - `CVE-2026-13676`, `CVE-2026-16221`:  `fast-uri` -> 3.1.4
+    (host confusion via literal backslash authority delimiter, and via failed IDN
+    canonicalization)
+  - `CVE-2026-59869`:  `js-yaml` -> 3.15.0 / 4.3.0
+    (quadratic-complexity denial of service in YAML merge-key handling)
+  - `GHSA-r28c-9q8g-f849`:  `postcss` -> 8.5.23
+    (path traversal in previous-source-map auto-loading via `sourceMappingURL`)
+  - `GHSA-8988-4f7v-96qf`:  `@opentelemetry/core` -> 2.8.0
+    (unbounded memory allocation in W3C Baggage propagation)
 
 
 ## [1.0.7] - 2026-06-17 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.7
 
-Initial release of the Kinetica Grafana Datasource Plugin. Earlier `v1.0.0`–`v1.0.6`
-tags exist in the repository but were internal pre-release iterations, so this entry
-documents the plugin as first shipped.
+Initial release of the Kinetica Grafana Datasource Plugin.
 
 ### Requirements
 - Grafana 12.3.0 or later. The plugin is built against Grafana SDK 12.3.0 and
