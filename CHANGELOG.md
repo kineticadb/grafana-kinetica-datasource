@@ -11,7 +11,7 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
-## [Unreleased]
+## [1.0.10] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.10
 
 ### Added
 - Dashboard and template variables are now interpolated into queries via
