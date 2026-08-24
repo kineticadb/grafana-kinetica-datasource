@@ -25,7 +25,7 @@ version numbers here are not contiguous.
   time-column metadata lookup keeps working when the table name is dynamic.
 - First jest unit tests (`src/datasource.test.ts`) covering the interpolation
   formatter and `applyTemplateVariables`.
-- README documents the template-variable behaviour, including the need to use
+- README documents the template-variable behavior, including the need to use
   `${var:sqlstring}` for single-value string values (a bare `'$var'` is not escaped,
   matching how Grafana's own SQL datasources behave).
 
