@@ -21,15 +21,16 @@ datasources:
     type: kinetica-grafana-datasource   # Must match the "id" in your plugin.json
     access: proxy
     orgId: 1
-    url: http://localhost:9191
+    # Values come from the .env file that docker-compose loads (env_file: - .env).
+    url: $KINETICA_URL
     isDefault: true
     version: 1
     editable: true
 
     jsonData:
       path: /resources
-      username: test-user
+      username: $KINETICA_USER
       tlsSkipVerify: true
 
     secureJsonData:
-      password: test-password
+      password: $KINETICA_PASSWORD

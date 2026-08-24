@@ -18,7 +18,7 @@ const quoteId = (val: string) => {
 };
 
 // Helper: Escape single quotes in string values for SQL
-const escapeStringValue = (val: string): string => {
+export const escapeStringValue = (val: string): string => {
     return val.replace(/'/g, "''");
 };
 

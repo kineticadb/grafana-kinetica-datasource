@@ -23,8 +23,8 @@ A properly configured test environment accelerates plugin review and helps users
 
 ```bash
 # Clone the repository
-git clone https://github.com/kinetica/grafana-datasource-plugin.git
-cd grafana-datasource-plugin
+git clone https://github.com/kineticadb/grafana-kinetica-datasource.git
+cd grafana-kinetica-datasource
 
 # Install dependencies
 npm install
@@ -32,9 +32,9 @@ npm install
 # Build frontend
 npm run build
 
-# Build backend (optional - binaries may be pre-built)
+# Build backend (all platforms; use `mage build` for the current platform only)
 go install github.com/magefile/mage@latest
-~/go/bin/mage BuildBackend
+~/go/bin/mage buildAll
 ```
 
 ### 3. Configure Environment
@@ -55,6 +55,10 @@ Required environment variables:
 | `KINETICA_USER` | Database username | `admin` |
 | `KINETICA_PASSWORD` | Database password | `your_password` |
 
+> **`.env` is required.** `docker-compose.yaml` declares `env_file: - .env`, so
+> `docker compose up` fails outright if the file is missing. Use development
+> credentials here, not production ones.
+
 ### 4. Start Test Environment
 
 ```bash
@@ -62,12 +66,12 @@ Required environment variables:
 docker compose up -d
 
 # Wait for Grafana to be ready
-curl http://localhost:3001/api/health
+curl http://localhost:3000/api/health
 ```
 
 ### 5. Access Grafana
 
-- **URL**: http://localhost:3001
+- **URL**: http://localhost:3000
 - **Username**: `admin`
 - **Password**: `admin`
 
@@ -84,8 +88,8 @@ curl http://localhost:3001/api/health
 
 The Docker Compose configuration:
 
-- Runs Grafana on port **3001** (to avoid conflicts)
-- Mounts the plugin from the local `dist/` directory
+- Runs Grafana on port **3000**
+- Mounts the repository root as the plugin directory (Grafana finds `dist/plugin.json`)
 - Loads provisioning from `./provisioning/`
 - Allows unsigned plugins for development
 - Maps `host.docker.internal` for local Kinetica access
@@ -95,13 +99,15 @@ services:
   grafana:
     container_name: kinetica-grafana-dev
     ports:
-      - "3001:3000"
+      - "3000:3000"
+    env_file:
+      - .env
     environment:
-      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-datasource
+      - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-grafana-datasource
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      - ./dist:/var/lib/grafana/plugins/kinetica-datasource
+      - ./:/var/lib/grafana/plugins/kinetica-grafana-datasource
       - ./provisioning:/etc/grafana/provisioning
 ```
 
@@ -114,15 +120,16 @@ apiVersion: 1
 
 datasources:
   - name: datasource
-    type: kinetica-datasource
+    uid: kinetica-grafana-datasource-test
+    type: kinetica-grafana-datasource
     access: proxy
-    url: ${KINETICA_URL}
+    url: $KINETICA_URL
     isDefault: true
     jsonData:
-      username: ${KINETICA_USER}
+      username: $KINETICA_USER
       tlsSkipVerify: true
     secureJsonData:
-      password: ${KINETICA_PASSWORD}
+      password: $KINETICA_PASSWORD
 ```
 
 ### Dashboard Provisioning (`provisioning/dashboards/`)
@@ -190,7 +197,7 @@ GROUP BY location
 4. Use datasource variable for portability:
    ```json
    "datasource": {
-     "type": "kinetica-datasource",
+     "type": "kinetica-grafana-datasource",
      "uid": "${DS_KINETICA}"
    }
    ```
@@ -227,7 +234,7 @@ docker compose up -d
 
 1. Verify Kinetica is accessible:
    ```bash
-   curl http://your-kinetica-host:9191/health
+   curl http://your-kinetica-host:9191/    # responds: Kinetica is running!
    ```
 
 2. Check environment variables:
@@ -298,11 +305,11 @@ test-environment:
 
     - name: Wait for Grafana
       run: |
-        timeout 60 bash -c 'until curl -s http://localhost:3001/api/health; do sleep 2; done'
+        timeout 60 bash -c 'until curl -s http://localhost:3000/api/health; do sleep 2; done'
 
     - name: Verify datasource provisioned
       run: |
-        curl -u admin:admin http://localhost:3001/api/datasources | jq '.[0].name'
+        curl -u admin:admin http://localhost:3000/api/datasources | jq '.[0].name'
 
     - name: Run e2e tests
       run: npm run e2e

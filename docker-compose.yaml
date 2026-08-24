@@ -1,5 +1,3 @@
-version: '3.7'
-
 services:
   grafana:
     container_name: kinetica-grafana-dev
@@ -15,9 +13,13 @@ services:
       - GF_LOG_FILTERS=plugin.kinetica-grafana-datasource:debug
       - GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-grafana-datasource
 
-    # 1. Load the .env file
+    # 1. Load the .env file.
+    # `required: false` so CI can still run `docker compose up`; locally the
+    # file supplies the Kinetica credentials used by
+    # provisioning/datasources/datasources.yml.
     env_file:
-      - .env
+      - path: .env
+        required: false
 
     # ----------------------------------------------------------------
     # NETWORK STRATEGY: Host Gateway

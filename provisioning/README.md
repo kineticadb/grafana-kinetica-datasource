@@ -27,6 +27,9 @@ KINETICA_USER=your_username
 KINETICA_PASSWORD=your_password
 ```
 
+> **`.env` is required.** `docker-compose.yaml` declares `env_file: - .env`, so
+> `docker compose up` fails outright if the file is missing.
+
 ## Quick Start
 
 1. **Create environment file**:
@@ -39,7 +42,7 @@ KINETICA_PASSWORD=your_password
    ```bash
    npm install
    npm run build
-   ~/go/bin/mage BuildBackend
+   ~/go/bin/mage buildAll
    ```
 
 3. **Start Grafana**:
@@ -48,7 +51,7 @@ KINETICA_PASSWORD=your_password
    ```
 
 4. **Access Grafana**:
-   - URL: http://localhost:3001
+   - URL: http://localhost:3000
    - Username: `admin`
    - Password: `admin`
 
@@ -63,10 +66,10 @@ The datasource is automatically provisioned from `datasources/datasources.yml`:
 | Setting | Value | Description |
 |---------|-------|-------------|
 | Name | `datasource` | Default datasource name |
-| Type | `kinetica-datasource` | Plugin ID |
-| URL | `${KINETICA_URL}` | Kinetica REST API endpoint |
-| Username | `${KINETICA_USER}` | Database username |
-| Password | `${KINETICA_PASSWORD}` | Database password (secure) |
+| Type | `kinetica-grafana-datasource` | Plugin ID |
+| URL | `$KINETICA_URL` | Kinetica REST API endpoint, from `.env` |
+| Username | `$KINETICA_USER` | Database username, from `.env` |
+| Password | `$KINETICA_PASSWORD` | Database password, from `.env` (stored encrypted) |
 
 ## Sample Dashboard
 
@@ -107,7 +110,7 @@ The sample dashboard (`kinetica-sample-dashboard.json`) includes:
 4. Ensure the dashboard uses the datasource variable:
    ```json
    "datasource": {
-     "type": "kinetica-datasource",
+     "type": "kinetica-grafana-datasource",
      "uid": "${DS_KINETICA}"
    }
    ```

@@ -604,7 +604,7 @@ unset GRAFANA_ACCESS_POLICY_TOKEN
 ```
 
 **Never add to**:
-- ❌ .env files (tracked by git)
+- ❌ .env files
 - ❌ Shell history (use space before command)
 - ❌ Docker images
 - ❌ Public CI logs
