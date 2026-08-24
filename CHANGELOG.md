@@ -11,6 +11,17 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
+## [1.0.11] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.11
+
+### Changed
+- Transitive dependencies for security issues:
+  - `fast-uri` 3.1.4 -> 3.1.6 for (GHSA-7p8r-x3mc-p8w7 / CVE-2026-18446)
+  - `js-yaml` 4.3.0 -> 4.3.1 and 3.15.0 -> 3.15.1 (GHSA-5p4m-2wfm-xmqj / CVE-2026-59870)
+  - `nanoid` 3.3.16 -> 3.3.18 (GHSA-2v37-7h3g-55p8 / CVE-2026-67213)
+  - `brace-expansion` 1.1.16 -> 1.1.18, 2.1.2 -> 2.1.4 and 5.0.8 -> 5.0.9
+    (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895)
+
+
 ## [1.0.10] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.10
 
 ### Added
