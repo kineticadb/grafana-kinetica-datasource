@@ -1,14 +1,42 @@
-import { DataSourceInstanceSettings, CoreApp, DataQueryRequest, DataQueryResponse, DataFrame } from '@grafana/data';
-import { DataSourceWithBackend } from '@grafana/runtime';
+import { DataSourceInstanceSettings, CoreApp, DataQueryRequest, DataQueryResponse, DataFrame, ScopedVars } from '@grafana/data';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { KineticaDataSourceOptions, KineticaQuery, defaultQuery } from './types';
+import { escapeStringValue } from './sqlGenerator';
 
 // Result type for resource fetches that includes error information
 export interface ResourceFetchResult<T> {
   data: T;
   error?: string;
+}
+
+/**
+ * Formats a template variable value for interpolation into SQL.
+ *
+ * Follows the convention used by Grafana's own SQL datasources:
+ *  - single-value variables interpolate verbatim, so they can be used as
+ *    identifiers (`FROM $table`) or inside quotes the user wrote (`= '$name'`);
+ *  - multi-value / "include all" variables are quoted and comma-joined so they
+ *    work in `IN ($hosts)`.
+ * Without this, a multi-value variable interpolates as `{a,b}`, which is not
+ * valid SQL.
+ */
+export function interpolateSqlVariable(value: unknown, variable?: { multi?: boolean; includeAll?: boolean }): unknown {
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map((v) => `'${escapeStringValue(String(v))}'`).join(',');
+  }
+  if (typeof value === 'string') {
+    if (variable?.multi || variable?.includeAll) {
+      return `'${escapeStringValue(value)}'`;
+    }
+    return value;
+  }
+  return value;
 }
 
 export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDataSourceOptions> {
@@ -18,6 +46,34 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
 
   getDefaultQuery(app: CoreApp): Partial<KineticaQuery> {
     return defaultQuery;
+  }
+
+  /**
+   * Interpolates dashboard/template variables before the query reaches the backend.
+   *
+   * `rawSql` is what the backend actually executes. The `builder` fields are also
+   * interpolated because the backend reads `builder.schema` / `builder.table` as
+   * metadata to look up column types (time-column detection); leaving a variable
+   * uninterpolated there yields correct SQL but a failed metadata lookup, so time
+   * columns would silently render as numbers.
+   */
+  applyTemplateVariables(query: KineticaQuery, scopedVars: ScopedVars): KineticaQuery {
+    const templateSrv = getTemplateSrv();
+    const interpolated: KineticaQuery = {
+      ...query,
+      rawSql: templateSrv.replace(query.rawSql ?? '', scopedVars, interpolateSqlVariable),
+    };
+
+    if (query.builder) {
+      interpolated.builder = {
+        ...query.builder,
+        // No custom formatter: these are identifiers, so they must not be quoted.
+        schema: templateSrv.replace(query.builder.schema ?? '', scopedVars),
+        table: templateSrv.replace(query.builder.table ?? '', scopedVars),
+      };
+    }
+
+    return interpolated;
   }
 
   // Intercept the query response to fix column ordering

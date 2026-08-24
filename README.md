@@ -5,7 +5,9 @@
 [![Downloads](https://img.shields.io/badge/dynamic/json?logo=grafana&color=F47A20&label=downloads&query=downloads&url=https://grafana.com/api/plugins/kinetica-grafana-datasource)](https://grafana.com/grafana/plugins/kinetica-grafana-datasource)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Connect Grafana to [Kinetica](https://www.kinetica.com) for real-time analytics and visualization of large-scale data. This plugin lets you query Kinetica using a visual query builder or raw SQL, and display the results in Grafana panels.
+Connect Grafana to [Kinetica](https://www.kinetica.com) for real-time analytics and
+visualization of large-scale data. This plugin lets you query Kinetica using a visual
+query builder or raw SQL, and display the results in Grafana panels.
 
 ![Kinetica Query Builder](src/img/query-editor.png)
 
@@ -13,28 +15,39 @@ Connect Grafana to [Kinetica](https://www.kinetica.com) for real-time analytics 
 
 - **Visual Query Builder** — build SQL without writing it by hand
   - Schema, table, and column selection with autocomplete driven by live Kinetica metadata
-  - Aggregation functions: `AVG`, `COUNT`, `MAX`, `MIN`, `SUM`, `VAR`, `STDDEV_POP`, `STDDEV_SAMP`, `VAR_POP`, `VAR_SAMP`
+  - Aggregation functions: `AVG`, `COUNT`, `MAX`, `MIN`, `SUM`, `VAR`, `STDDEV_POP`,
+    `STDDEV_SAMP`, `VAR_POP`, `VAR_SAMP`
   - JOINs (`INNER`, `LEFT`, `RIGHT`, `FULL`) with multiple conditions
   - `WHERE` filters with AND/OR logic, and `HAVING` filters
   - `GROUP BY`, `ORDER BY` (ASC/DESC), `LIMIT`, and `DISTINCT`
-  - Set operations: `UNION`, `UNION ALL`, `INTERSECT`, `INTERSECT ALL`, `EXCEPT`, `EXCEPT ALL`
+  - Set operations: `UNION`, `UNION ALL`, `INTERSECT`, `INTERSECT ALL`, `EXCEPT`,
+    `EXCEPT ALL`
 - **Raw SQL Mode** — write queries directly in a Monaco editor with syntax highlighting
-- **Time Series Support** — time columns are detected from Kinetica table metadata and converted automatically, so `datetime`/`timestamp`/`date` columns render as time series
+- **Time Series Support** — time columns are detected from Kinetica table metadata and
+  converted automatically, so `datetime`/`timestamp`/`date` columns render as time series
 - **Table Visualizations** — display query results in Grafana tables
 - **Grafana Alerting** — create alerts from Kinetica query results
-- **Secure Credentials** — passwords are stored in Grafana's encrypted secret storage and only ever decrypted in the backend
-- **Concurrent Query Execution** — panels issuing multiple queries run them in parallel rather than sequentially
+- **Secure Credentials** — passwords are stored in Grafana's encrypted secret storage and
+  only ever decrypted in the backend
+- **Concurrent Query Execution** — panels issuing multiple queries run them in parallel
+  rather than sequentially
 
 ## Requirements
 
 - Grafana >= 12.3.0
 - Kinetica >= 7.x
 
-**Note:** Grafana versions before 12.3.0 are not supported. The plugin is built against Grafana SDK 12.3.0 and `plugin.json` declares `grafanaDependency: ">=12.3.0"` to match; older versions are neither claimed nor tested. See [`docs/DEPENDENCY_MISMATCH_ANALYSIS.md`](docs/DEPENDENCY_MISMATCH_ANALYSIS.md) for the rationale.
+**Note:** Grafana versions before 12.3.0 are not supported. The plugin is built against
+Grafana SDK 12.3.0 and `plugin.json` declares `grafanaDependency: ">=12.3.0"` to match;
+older versions are neither claimed nor tested. See
+[`docs/DEPENDENCY_MISMATCH_ANALYSIS.md`](docs/DEPENDENCY_MISMATCH_ANALYSIS.md) for the
+rationale.
 
 ## Installation
 
-The plugin is published in the [Grafana plugin catalog](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/) as `kinetica-grafana-datasource`.
+The plugin is published in the
+[Grafana plugin catalog](https://grafana.com/grafana/plugins/kinetica-grafana-datasource/)
+as `kinetica-grafana-datasource`.
 
 ### From the Grafana catalog (recommended)
 
@@ -44,17 +57,22 @@ Using the Grafana CLI:
 grafana cli plugins install kinetica-grafana-datasource
 ```
 
-Or from the UI: **Administration > Plugins**, search for "Kinetica", and click **Install**. Restart Grafana afterwards.
+Or from the UI: **Administration > Plugins**, search for "Kinetica", and click
+**Install**. Restart Grafana afterwards.
 
 ### Manual installation
 
-1. Download the latest release from the [releases page](https://github.com/kineticadb/grafana-kinetica-datasource/releases).
+1. Download the latest release from the
+   [releases page](https://github.com/kineticadb/grafana-kinetica-datasource/releases).
 2. Extract it into your Grafana plugins directory (usually `/var/lib/grafana/plugins`).
 3. Restart Grafana.
 
-Release archives are **signed** (a commercial signature issued to the `kinetica` organization), so no unsigned-plugin allowance is needed. Locally built development builds *are* unsigned — see [Running locally](#running-locally).
+Release archives are **signed** (a commercial signature issued to the `kinetica`
+organization), so no unsigned-plugin allowance is needed. Locally built development builds
+*are* unsigned — see [Running locally](#running-locally).
 
-The plugin ships a backend binary (`gpx_kinetica_datasource`) that Grafana launches as a child process, so the plugin directory must be on a filesystem that permits execution.
+The plugin ships a backend binary (`gpx_kinetica_datasource`) that Grafana launches as a
+child process, so the plugin directory must be on a filesystem that permits execution.
 
 ## Configuration
 
@@ -64,7 +82,8 @@ The plugin ships a backend binary (`gpx_kinetica_datasource`) that Grafana launc
    - **URL** — your Kinetica server URL (e.g. `http://localhost:9191`)
    - **User** — database username
    - **Password** — database password (stored encrypted)
-   - **Skip TLS Verify** — skips TLS certificate verification. Insecure; use only for testing.
+   - **Skip TLS Verify** — skips TLS certificate verification. Insecure; use only for
+     testing.
 4. Click **Save & test** to verify the connection.
 
 ![Configuration](src/img/config-editor.png)
@@ -74,10 +93,13 @@ The plugin ships a backend binary (`gpx_kinetica_datasource`) that Grafana launc
 ### Visual Query Builder
 
 1. Create a panel and select the Kinetica datasource.
-2. Build the query: pick a schema and table, add columns with optional aggregations, add JOINs, `WHERE` filters, `GROUP BY`, and `ORDER BY`.
+2. Build the query: pick a schema and table, add columns with optional aggregations, add
+   JOINs, `WHERE` filters, `GROUP BY`, and `ORDER BY`.
 3. Click **Run Query**.
 
-Column order in the panel matches your SELECT order. If Kinetica is unreachable, the editor shows a dismissible **Connection Error** alert rather than silently rendering empty dropdowns.
+Column order in the panel matches your SELECT order. If Kinetica is unreachable, the
+editor shows a dismissible **Connection Error** alert rather than silently rendering empty
+dropdowns.
 
 ### Raw SQL Mode
 
@@ -92,7 +114,10 @@ Column order in the panel matches your SELECT order. If Kinetica is unreachable,
 1. Select a time column in the **Time Column** dropdown.
 2. Use `$__timeFilter()` in your query so Grafana's time range picker filters the data.
 
-Time handling is metadata-driven: the backend inspects the table schema to learn which columns are `datetime`, `timestamp`, or `date`. Aggregates are handled carefully — only time-preserving aggregates (`MIN`, `MAX`, `FIRST`, `LAST`, or none) keep a column typed as time, while `COUNT`/`SUM`/`AVG` of a date column produce a number.
+Time handling is metadata-driven: the backend inspects the table schema to learn which
+columns are `datetime`, `timestamp`, or `date`. Aggregates are handled carefully — only
+time-preserving aggregates (`MIN`, `MAX`, `FIRST`, `LAST`, or none) keep a column typed as
+time, while `COUNT`/`SUM`/`AVG` of a date column produce a number.
 
 ### Macros
 
@@ -106,18 +131,62 @@ These macros are expanded by the plugin backend before the query reaches Kinetic
 | `$__unixEpochFrom()` | Start of the selected time range, as a Unix epoch value |
 | `$__unixEpochTo()` | End of the selected time range, as a Unix epoch value |
 
+### Template variables
+
+Dashboard and template variables are interpolated into the query before it is sent to
+the backend, in both raw SQL and query-builder modes.
+
+- **Single-value variables** interpolate verbatim, so they work as identifiers:
+  `SELECT * FROM $table` becomes `SELECT * FROM sensors`.
+- **Multi-value and *Include All* variables** are quoted and comma-joined, so they work
+  directly in an `IN` list: `WHERE host IN ($hosts)` becomes `WHERE host IN ('web-01','web-02')`.
+  Single quotes inside the values are escaped.
+- **For a single-value variable used as a string, use `${var:sqlstring}`** rather than
+  quoting it yourself. Because single-value variables interpolate verbatim, writing
+  `WHERE name = '$user'` with a value of `O'Brien` produces `'O'Brien'`, which is
+  malformed. `WHERE name = ${user:sqlstring}` produces `'O''Brien'` correctly.
+  Avoid `${var:singlequote}` — it escapes with a backslash (`'O\'Brien'`), which is not
+  standard SQL.
+- Grafana's built-in variables (`$__from`, `$__to`, `$__interval`) are interpolated by
+  Grafana itself and can be used alongside the macros above.
+
+Variables used for the builder's **Schema** and **Table** fields are interpolated too,
+which keeps the backend's time-column detection working when the table name is dynamic.
+
 ## Known limitations
 
-- **No `$__timeGroup` macro.** Time bucketing must be written explicitly in SQL. Earlier versions of this README documented `$__timeGroup`, `$__from`, and `$__to`; none of them are implemented.
-- **Dashboard and template variables are not interpolated.** The datasource does not override `applyTemplateVariables`, so a reference such as `$myVar` is passed to Kinetica verbatim and will fail. Use the macros above for time ranges.
-- **`OFFSET` has no query-builder control.** It exists in the query model and SQL generator, so it can be set in a provisioned or hand-edited query JSON, but there is no field for it in the editor UI.
-- **Metadata calls are uncached.** Every schema, table, and column dropdown triggers a live database call.
-- **The E2E suite covers 7 stable scenarios** (alerts, provisioning, basic page loads), narrowed from an initial 34 so it passes reliably across supported Grafana versions. See [`E2E_TESTS_README.md`](E2E_TESTS_README.md).
-- Query errors surfaced in the Grafana UI are intentionally generic; the detail is written to the Grafana server log. Enable backend debug logging with `GF_LOG_FILTERS=plugin.kinetica-grafana-datasource:debug`.
+- **No `$__timeGroup` macro.** Time bucketing must be written explicitly in SQL. The
+  backend implements only the five macros listed above; `$__timeGroup` is not among them.
+  (`$__from` and `$__to` do work, but as Grafana built-in variables resolved during
+  template interpolation, not as backend macros.)
+- **Dashboard variables cannot be *defined* by a Kinetica query.** Variable values are
+  interpolated into queries (see **Template variables** above), but the datasource does
+  not implement `metricFindQuery`, so a dashboard variable of type *Query* cannot be
+  populated from Kinetica. Use a *Custom* variable, or populate it from another
+  datasource.
+- **In raw SQL mode, result columns come back in alphabetical order**, not in the order
+  you wrote them in `SELECT`. The backend sorts column names before building the frame
+  (`sort.Strings` in `parseToFrame`), and the frontend restores your order only when the
+  query carries query-builder metadata. Raw SQL has no such metadata, so nothing puts it
+  back. Aliasing columns so their names sort the way you want is the only workaround;
+  the query builder is unaffected.
+- **`OFFSET` has no query-builder control.** It exists in the query model and SQL
+  generator, so it can be set in a provisioned or hand-edited query JSON, but there is no
+  field for it in the editor UI.
+- **Metadata calls are uncached.** Every schema, table, and column dropdown triggers a
+  live database call.
+- **The E2E suite covers 7 stable scenarios** (alerts, provisioning, basic page loads),
+  narrowed from an initial 34 so it passes reliably across supported Grafana versions.
+  See [`E2E_TESTS_README.md`](E2E_TESTS_README.md).
+- Query errors surfaced in the Grafana UI are intentionally generic; the detail is written
+  to the Grafana server log. Enable backend debug logging with
+  `GF_LOG_FILTERS=plugin.kinetica-grafana-datasource:debug`.
 
 ## Documentation
 
-For Kinetica itself, see the [Kinetica Documentation](https://docs.kinetica.com). Plugin-specific engineering notes — packaging, release, dependency analysis, and CI troubleshooting — live in [`docs/`](docs/).
+For Kinetica itself, see the [Kinetica Documentation](https://docs.kinetica.com).
+Plugin-specific engineering notes — packaging, release, dependency analysis, and CI
+troubleshooting — live in [`docs/`](docs/).
 
 Release history is in [CHANGELOG.md](CHANGELOG.md).
 
@@ -156,9 +225,18 @@ npm run dev
 docker compose up -d
 ```
 
-Grafana is at http://localhost:3000 (default credentials: `admin`/`admin`). The backend connects to Kinetica at `host.docker.internal:9191` by default; copy `.env.example` to `.env` to set credentials.
+Grafana is at http://localhost:3000 (default credentials: `admin`/`admin`). The backend
+connects to Kinetica at `host.docker.internal:9191` by default; copy `.env.example` to
+`.env` to set credentials.
 
-Local builds are unsigned, so `docker-compose.yaml` sets `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-grafana-datasource`. If you load a local build into a Grafana instance of your own, you'll need the equivalent setting:
+> **`.env` is required.** `docker-compose.yaml` declares `env_file: - .env`, so
+> `docker compose up` fails outright if the file is missing. Use development
+> credentials here, not production ones.
+
+
+Local builds are unsigned, so `docker-compose.yaml` sets
+`GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS=kinetica-grafana-datasource`. If you load a
+local build into a Grafana instance of your own, you'll need the equivalent setting:
 
 ```ini
 # grafana.ini
@@ -166,7 +244,8 @@ Local builds are unsigned, so `docker-compose.yaml` sets `GF_PLUGINS_ALLOW_LOADI
 allow_loading_unsigned_plugins = kinetica-grafana-datasource
 ```
 
-Frontend changes are picked up by `npm run dev` on save. **Backend changes require `mage build` plus a Grafana restart.**
+Frontend changes are picked up by `npm run dev` on save.
+**Backend changes require `mage build` plus a Grafana restart.**
 
 ### Testing
 
@@ -192,16 +271,23 @@ npm run lint:fix   # eslint --fix + prettier
 npm run typecheck  # tsc --noEmit
 ```
 
-CI runs typecheck → lint → `test:ci` → frontend build → backend tests → `mage buildAll`. Run these locally before pushing.
+CI runs typecheck → lint → `test:ci` → frontend build → backend tests → `mage buildAll`.
+Run these locally before pushing.
 
 ## Architecture
 
 The plugin has two halves that ship together:
 
-- **Frontend** (`src/`, TypeScript + React) — config and query-editor UI, running inside Grafana's browser app. SQL is generated here from the builder model (`src/sqlGenerator.ts`).
-- **Backend** (`pkg/`, Go) — a standalone binary that Grafana launches as a child process and talks to over gRPC. **Only the backend talks to Kinetica**; the frontend reaches the database exclusively through backend resource calls.
+- **Frontend** (`src/`, TypeScript + React) — config and query-editor UI, running inside
+  Grafana's browser app. SQL is generated here from the builder model
+  (`src/sqlGenerator.ts`).
+- **Backend** (`pkg/`, Go) — a standalone binary that Grafana launches as a child process
+  and talks to over gRPC. **Only the backend talks to Kinetica**; the frontend reaches the
+  database exclusively through backend resource calls.
 
-The frontend sends both the finished `rawSql` and the structured builder model. The backend expands macros, executes the SQL via the Kinetica Go API, decodes the Avro response, and builds a Grafana data frame.
+The frontend sends both the finished `rawSql` and the structured builder model. The
+backend expands macros, executes the SQL via the Kinetica Go API, decodes the Avro
+response, and builds a Grafana data frame.
 
 ## Contributing
 

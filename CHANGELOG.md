@@ -11,6 +11,30 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
+## [Unreleased]
+
+### Added
+- Dashboard and template variables are now interpolated into queries via
+  `applyTemplateVariables`, in both raw SQL and query-builder modes. Single-value
+  variables interpolate verbatim so they can be used as identifiers
+  (`SELECT * FROM $table`); multi-value and *Include All* variables are quoted and
+  comma-joined so they work in an `IN` list. Single quotes in values are escaped,
+  reusing `escapeStringValue` from `sqlGenerator.ts` (now exported). Grafana's
+  built-in `$__from` / `$__to` / `$__interval` become usable as a side effect.
+  The builder's `schema` and `table` fields are interpolated too, so the backend's
+  time-column metadata lookup keeps working when the table name is dynamic.
+- First jest unit tests (`src/datasource.test.ts`) covering the interpolation
+  formatter and `applyTemplateVariables`.
+- README documents the template-variable behaviour, including the need to use
+  `${var:sqlstring}` for single-value string values (a bare `'$var'` is not escaped,
+  matching how Grafana's own SQL datasources behave).
+
+### Known limitations
+- Dashboard variables still cannot be *defined* by a Kinetica query: the datasource
+  does not implement `metricFindQuery`, so a *Query*-type dashboard variable cannot
+  be populated from Kinetica.
+
+
 ## [1.0.9] - 2026-07-28 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.9
 
 ### Added
