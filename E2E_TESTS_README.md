@@ -14,18 +14,28 @@ This document explains our E2E testing approach, which follows Grafana's best pr
 **Note:** As of 2026-04-16, plugin minimum Grafana version updated from `>=10.4.0` to `>=12.3.0` to match SDK dependencies.
 
 **Test Count**:
-- **7 passing tests** (all stable)
+- **7 passing tests in CI** (all stable)
+- **3 conditional tests** that need a live Kinetica and self-skip without one
 - **28+ skipped tests** (documented with reasons)
 
 **What's Tested**:
 - ✅ Alert rules (5 tests) - Most stable, uses direct page navigation
 - ✅ Config editor (1 test) - Ultra-minimal page load check
 - ✅ Dashboard loads (1 test) - Verifies dashboard title appears
+- ✅ Query variables (3 tests) - Only with a live database; see below
 
 **Recent Experiments (2026-04-17)**:
 - ❌ **Query Editor Tests**: Attempted to add 3 ultra-minimal tests using generic CSS selectors (avoiding @grafana/plugin-e2e library methods). Tests passed locally (10 total) but failed in actual use. All reverted. See `docs/QUERY_EDITOR_TEST_EXPERIMENT.md` for details.
 
-**Empirical Finding**: **7 stable tests is the realistic, empirically validated limit.** Even generic CSS selectors and avoiding library methods doesn't work across versions.
+**Empirical Finding**: **7 stable tests is the realistic, empirically validated limit *for cross-version CI*.** Even generic CSS selectors and avoiding library methods doesn't work across versions.
+
+**Qualifier (2026-08-25)**: that limit applies to tests that must pass on every supported
+Grafana version in CI. It is not a ceiling on E2E testing generally. `variableQueries.spec.ts`
+adds 3 tests outside it by giving up cross-version guarantees on purpose: they run against
+one local Grafana with a live Kinetica and self-skip everywhere else. Scoped that way they
+caught two real bugs that every unit test passed, so the pattern is worth reusing when
+behavior only exists in the browser - but it buys reliability with coverage, not with
+better selectors, and does nothing for the cross-version problem above.
 
 **Critical Discovery**:
 Even @grafana/plugin-e2e library methods like `panelEditPage.getQueryEditorRow()` use version-specific selectors internally. This means provisioning-based testing can't fully solve cross-version compatibility, even within the 12.x-13.x range.
@@ -178,6 +188,27 @@ From Grafana's documentation:
 
 **Why it works**: Alert rule UI hasn't changed significantly.
 
+### ✅ variableQueries.spec.ts (3 tests, conditional)
+
+**What's tested**:
+- A single-column query populates a *Query* variable
+- `__text` supplies the label while `__value` supplies the stored value
+- Two variables on one dashboard both resolve (they used to cancel each other)
+
+**What's skipped**: Nothing, but all three self-skip when the datasource health check
+fails - which is the case in CI, where Grafana runs without a Kinetica behind it.
+
+**Why it works**: It drives the provisioned dashboard
+`provisioning/dashboards/kinetica-variable-smoke.json` and asserts on the URL's `var-*`
+parameters rather than on Grafana's internal test IDs, so it does not depend on the
+version-specific selectors that forced the other UI tests to be skipped.
+
+**Why it is worth the exception**: the variable path runs entirely in the browser, so
+unit tests with a mocked Grafana cannot cover it. Both bugs it caught - a shared
+`requestId` that made concurrent variable queries abort one another, and a DataFrame
+wrapper that discarded `__value` - passed every unit test.
+
+
 ## Manual Testing Checklist
 
 Before each release, manually verify on **Grafana 10.4+, 11.x, and 12.x**:
@@ -323,7 +354,8 @@ If all tests suddenly fail, check:
 Our E2E testing strategy is **brutally pragmatic**: we only test what actually works across versions.
 
 **What we achieved**:
-- ✅ 7 stable tests across supported Grafana versions (12.3.0+)
+- ✅ 7 stable tests across supported Grafana versions (12.3.0+), plus 3 conditional
+  variable tests that need a live database and self-skip in CI
 - ✅ CI passes consistently (no flaky tests)
 - ✅ Clear signal when real bugs occur
 - ✅ Honest acknowledgment of limitations
