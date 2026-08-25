@@ -10,6 +10,16 @@ export const defaultQuery: Partial<KineticaQuery> = {
   rawSql: 'SELECT * FROM ITER',
 };
 
+/**
+ * Query behind a Grafana dashboard variable of type *Query*.
+ *
+ * Extends `DataQuery` because `CustomVariableSupport` requires it, but carries no
+ * builder metadata: a variable query is only ever raw SQL.
+ */
+export interface KineticaVariableQuery extends DataQuery {
+  rawSql: string;
+}
+
 export interface KineticaDataSourceOptions extends DataSourceJsonData {
   url?: string;
   username?: string;

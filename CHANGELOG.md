@@ -11,6 +11,19 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
+## [1.0.12] - <TBD> - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
+
+### Added
+- Dashboard variables of type *Query* can now be populated from Kinetica. The datasource
+  implements `metricFindQuery` and registers a variable query editor, so the SQL can be
+  entered directly on the variable.
+  - A single result column supplies both the label and the value.
+  - `__text` / `__value` columns display one thing and store another, matching the
+    convention used by Grafana's other SQL datasources.
+  - Variable queries run through the normal query path, so backend macros still expand
+    and one variable query may reference another (chained variables).
+
+
 ## [1.0.11] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.11
 
 ### Changed
