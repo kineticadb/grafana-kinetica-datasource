@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -161,6 +162,16 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 		}
 	}
 
+	// 5b. Aliases produced by $__timeGroup
+	// The macro emits a TIMESTAMP() expression, but parseToFrame types columns by
+	// looking their name up in the base table's metadata -- and an alias like
+	// "time" is not a column of that table, so the bucket would arrive as a plain
+	// number and Grafana would not draw a time series. The alias is read from the
+	// pre-expansion SQL, where the macro is still recognisable.
+	for _, alias := range timeGroupAliases(qModel.RawSql) {
+		timeCols[alias] = true
+	}
+
 	// 6. Execute SQL
 	logDebug("Sending query to Kinetica", "refId", query.RefID)
 	options := &kinetica.ExecuteSqlOptions{Encoding: "binary"}
@@ -243,6 +254,85 @@ func (d *Datasource) getTimeColumns(ctx context.Context, db *kinetica.Kinetica, 
 	return timeCols, nil
 }
 
+// parseIntervalMillis converts a Grafana interval literal into milliseconds.
+// Accepts "30s", "5m", "1h", "7d", "2w" and "500ms", with or without surrounding
+// quotes, since users write $__timeGroup(ts, '5m') as well as
+// $__timeGroup(ts, $__interval). A bare number is taken as milliseconds, matching
+// what Grafana substitutes for $__interval_ms.
+
+// timeGroupAliases returns the aliases assigned to $__timeGroup(...) expressions in
+// a query, e.g. "time" for `$__timeGroup(ts, 5m) AS time`. Used to mark those output
+// columns as time columns, which their name alone cannot reveal.
+func timeGroupAliases(sql string) []string {
+	re := regexp.MustCompile(`(?i)\$__timeGroup\([^()]*\)\s+AS\s+"?([A-Za-z0-9_]+)"?`)
+	var aliases []string
+	for _, m := range re.FindAllStringSubmatch(sql, -1) {
+		if len(m) > 1 {
+			aliases = append(aliases, m[1])
+		}
+	}
+	return aliases
+}
+
+func parseIntervalMillis(raw string) (int64, error) {
+	s := strings.TrimSpace(raw)
+	s = strings.Trim(s, "'\"")
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return 0, fmt.Errorf("$__timeGroup: empty interval")
+	}
+
+	// "ms" must be tested before "s", and "m" only after both.
+	units := []struct {
+		suffix string
+		millis int64
+	}{
+		{"ms", 1},
+		{"s", 1000},
+		{"m", 60 * 1000},
+		{"h", 60 * 60 * 1000},
+		{"d", 24 * 60 * 60 * 1000},
+		{"w", 7 * 24 * 60 * 60 * 1000},
+	}
+
+	for _, u := range units {
+		if !strings.HasSuffix(s, u.suffix) {
+			continue
+		}
+		n, err := strconv.ParseInt(strings.TrimSpace(strings.TrimSuffix(s, u.suffix)), 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("$__timeGroup: invalid interval %q", raw)
+		}
+		if n <= 0 {
+			return 0, fmt.Errorf("$__timeGroup: interval %q must be positive", raw)
+		}
+		return n * u.millis, nil
+	}
+
+	n, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("$__timeGroup: invalid interval %q", raw)
+	}
+	if n <= 0 {
+		return 0, fmt.Errorf("$__timeGroup: interval %q must be positive", raw)
+	}
+	return n, nil
+}
+
+// timeGroupExpr builds SQL rounding a time value down to an interval boundary.
+//
+// TIME_BUCKET(width_ms, ts) is Kinetica's native bucketing function and takes a
+// bare numeric width in milliseconds, which is the unit parseIntervalMillis already
+// produces. It returns a datetime, so time-of-day survives and sub-second widths work.
+//
+// The column is wrapped in TIMESTAMP() to make this work for every column kind:
+// passed a raw epoch-milliseconds number, TIME_BUCKET reads it as a time-of-day and
+// silently loses the date. TIMESTAMP() is a no-op for columns that are already
+// timestamps and parses string datetimes, so one form covers all three.
+func timeGroupExpr(colName string, millis int64) string {
+	return fmt.Sprintf("TIME_BUCKET(%d, TIMESTAMP(%s))", millis, colName)
+}
+
 func prepareSql(ctx context.Context, q backend.DataQuery, db *kinetica.Kinetica) (string, error) {
 	var qModel QueryModel
 	if err := json.Unmarshal(q.JSON, &qModel); err != nil {
@@ -297,6 +387,31 @@ func prepareSql(ctx context.Context, q backend.DataQuery, db *kinetica.Kinetica)
 	sql = reUnixTo.ReplaceAllStringFunc(sql, func(match string) string {
 		return fmt.Sprintf("%d", q.TimeRange.To.UnixMilli())
 	})
+
+	// 6. $__timeGroup(col, interval)
+	// ReplaceAllStringFunc cannot return an error, so the first failure is captured
+	// and reported after the walk rather than silently leaving the macro in place.
+	reTimeGroup := regexp.MustCompile(`\$__timeGroup\(([^,()]+),([^()]+)\)`)
+	var timeGroupErr error
+	sql = reTimeGroup.ReplaceAllStringFunc(sql, func(match string) string {
+		if timeGroupErr != nil {
+			return match
+		}
+		submatches := reTimeGroup.FindStringSubmatch(match)
+		if len(submatches) < 3 {
+			return match
+		}
+		colName := strings.TrimSpace(submatches[1])
+		millis, err := parseIntervalMillis(submatches[2])
+		if err != nil {
+			timeGroupErr = err
+			return match
+		}
+		return timeGroupExpr(colName, millis)
+	})
+	if timeGroupErr != nil {
+		return "", timeGroupErr
+	}
 
 	return sql, nil
 }
@@ -466,6 +581,43 @@ func createClient(ctx context.Context, cfg *DataSourceSettings, s *backend.DataS
 	return kinetica.NewWithOptions(ctx, dbUrl, &opts)
 }
 
+// kineticaTimeLayouts are the string forms Kinetica uses for its date and datetime
+// types, most precise first.
+var kineticaTimeLayouts = []string{
+	"2006-01-02 15:04:05.000",
+	"2006-01-02 15:04:05",
+	"2006-01-02T15:04:05.000Z07:00",
+	"2006-01-02",
+}
+
+// parseKineticaTimes converts a column of Kinetica time strings to timestamps.
+// It reports false unless every non-null value parses, so a column that only looks
+// like a time is left as text rather than being half-converted.
+func parseKineticaTimes(sliceData []any) ([]*time.Time, bool) {
+	vector := make([]*time.Time, len(sliceData))
+	for i, v := range sliceData {
+		if v == nil {
+			continue
+		}
+		str, ok := v.(string)
+		if !ok {
+			return nil, false
+		}
+		parsed := false
+		for _, layout := range kineticaTimeLayouts {
+			if t, err := time.Parse(layout, str); err == nil {
+				vector[i] = &t
+				parsed = true
+				break
+			}
+		}
+		if !parsed {
+			return nil, false
+		}
+	}
+	return vector, true
+}
+
 func parseToFrame(results *map[string]any, timeCols map[string]bool, refID string) (*data.Frame, error) {
 	frame := data.NewFrame("response")
 	frame.RefID = refID
@@ -560,6 +712,16 @@ func parseToFrame(results *map[string]any, timeCols map[string]bool, refID strin
 			}
 
 		case string:
+			// Kinetica returns its string-backed time types (date, datetime, and the
+			// datetime that TIME_BUCKET produces) as formatted strings rather than
+			// epoch integers, so they need parsing before Grafana will plot them.
+			if isTimeColumn {
+				if times, ok := parseKineticaTimes(sliceData); ok {
+					frame.Fields = append(frame.Fields, data.NewField(colName, nil, times))
+					continue
+				}
+				logWarn("Time column did not parse as a timestamp; leaving it as text", "column", colName)
+			}
 			vector := make([]*string, rowCount)
 			for i, v := range sliceData {
 				if v != nil {

@@ -238,13 +238,18 @@ ORDER BY timestamp ASC
 
 The plugin supports Grafana's built-in macros for time-range queries:
 
+Note the trailing `()` on the time macros: they are matched literally, so `$__timeFrom`
+without parentheses is left in the query untouched.
+
 | Macro | Description |
 |-------|-------------|
-| `$__timeFrom` | Start of selected time range (epoch milliseconds) |
-| `$__timeTo` | End of selected time range (epoch milliseconds) |
-| `$__timeFilter(column)` | Generates time filter for specified column |
-| `$__interval` | Suggested interval based on panel width |
-| `$__timeGroup(column, interval)` | Groups timestamps by specified interval |
+| `$__timeFrom()` | Start of selected time range, as a quoted timestamp literal |
+| `$__timeTo()` | End of selected time range, as a quoted timestamp literal |
+| `$__unixEpochFrom()` | Start of selected time range, as epoch milliseconds |
+| `$__unixEpochTo()` | End of selected time range, as epoch milliseconds |
+| `$__timeFilter(column)` | Generates a time filter for the specified column |
+| `$__timeGroup(column, interval)` | Rounds a time column down to interval boundaries |
+| `$__interval` | Suggested interval based on panel width (resolved by Grafana, not the backend) |
 
 ### 5.2 Query Editor Features
 
@@ -542,11 +547,14 @@ The GitHub Actions workflow will build, sign, and create a release with the plug
 
 | Macro | Example Output |
 |-------|----------------|
-| `$__timeFrom` | `1704067200000` |
-| `$__timeTo` | `1704153600000` |
-| `$__timeFilter(ts)` | `ts >= 1704067200000 AND ts <= 1704153600000` |
+| `$__timeFrom()` | `'2024-01-01 00:00:00.000'` |
+| `$__timeTo()` | `'2024-01-02 00:00:00.000'` |
+| `$__unixEpochFrom()` | `1704067200000` |
+| `$__unixEpochTo()` | `1704153600000` |
+| `$__timeFilter(ts)` | `ts >= 1704067200000 AND ts <= 1704153600000` (epoch form) |
+| `$__timeFilter(ts)` | `ts >= '2024-01-01 00:00:00.000' AND ts <= '2024-01-02 00:00:00.000'` (string/date column) |
 | `$__interval` | `1m`, `5m`, `1h` (auto-calculated) |
-| `$__timeGroup(ts, 1h)` | `FLOOR(ts / 3600000) * 3600000` |
+| `$__timeGroup(ts, 1h)` | `TIME_BUCKET(3600000, TIMESTAMP(ts))` |
 
 ### A.2 Useful npm Commands
 

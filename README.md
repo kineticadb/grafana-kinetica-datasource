@@ -130,6 +130,7 @@ These macros are expanded by the plugin backend before the query reaches Kinetic
 | `$__timeTo()` | End of the selected time range |
 | `$__unixEpochFrom()` | Start of the selected time range, as a Unix epoch value |
 | `$__unixEpochTo()` | End of the selected time range, as a Unix epoch value |
+| `$__timeGroup(column, interval)` | Rounds a time column down to interval boundaries, for `GROUP BY`. Accepts `30s`, `5m`, `1h`, `7d`, `500ms`, quoted or bare, and `$__interval`. Expands to Kinetica's `TIME_BUCKET`, and the aliased result is typed as a time field so Grafana draws a time series. |
 
 ### Template variables
 
@@ -180,10 +181,6 @@ SELECT DISTINCT host FROM prod.sensors ORDER BY host
 
 ## Known limitations
 
-- **No `$__timeGroup` macro.** Time bucketing must be written explicitly in SQL. The
-  backend implements only the five macros listed above; `$__timeGroup` is not among them.
-  (`$__from` and `$__to` do work, but as Grafana built-in variables resolved during
-  template interpolation, not as backend macros.)
 - **In raw SQL mode, result columns come back in alphabetical order**, not in the order
   you wrote them in `SELECT`. The backend sorts column names before building the frame
   (`sort.Strings` in `parseToFrame`), and the frontend restores your order only when the

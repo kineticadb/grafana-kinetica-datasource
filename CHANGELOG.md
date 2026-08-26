@@ -22,6 +22,14 @@ version numbers here are not contiguous.
     convention used by Grafana's other SQL datasources.
   - Variable queries run through the normal query path, so backend macros still expand
     and one variable query may reference another (chained variables).
+- `$__timeGroup(column, interval)` macro, for bucketing a time column in a `GROUP BY`.
+  - Accepts `500ms`, `30s`, `5m`, `1h`, `7d`, `2w`, quoted or bare, a plain number of
+    milliseconds, and Grafana's `$__interval`.
+  - The macro's alias is registered as a time column, so the bucket is returned as a
+    Grafana time field rather than a number and panels render as time series.
+- `parseToFrame` now converts Kinetica's string-backed `date` / `datetime` columns to
+  timestamps. Previously only integer `timestamp` columns became time fields, so a
+  `datetime` column arrived as text and could not be plotted.
 
 
 ## [1.0.11] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.11
