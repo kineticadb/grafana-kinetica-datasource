@@ -31,6 +31,11 @@ version numbers here are not contiguous.
   timestamps. Previously only integer `timestamp` columns became time fields, so a
   `datetime` column arrived as text and could not be plotted.
 
+### Changed
+- Transitive dependencies for security issues:
+  - `react-use` 17.6.0 -> 17.6.1, which moved `js-cookie` 2.2.1 -> 3.0.8 (GHSA-qjx8-664m-686j).
+  - `immutable` 5.1.4 -> 5.1.9 (GHSA-v56q-mh7h-f735, GHSA-wf6x-7x77-mvgw, GHSA-xvcm-6775-5m9r).
+
 
 ## [1.0.11] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.11
 

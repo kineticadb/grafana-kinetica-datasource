@@ -53,7 +53,7 @@
         {
           "refId": "A",
           "datasource": { "type": "kinetica-grafana-datasource", "uid": "kinetica-grafana-datasource-test" },
-          "rawSql": "SELECT table_name FROM ki_catalog.ki_tables WHERE schema_name = '$schema' ORDER BY table_name LIMIT 20",
+          "rawSql": "SELECT DISTINCT table_name FROM ki_catalog.ki_columns WHERE schema_name = '$schema' ORDER BY table_name LIMIT 20",
           "format": "table"
         }
       ]
