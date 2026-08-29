@@ -17,6 +17,28 @@ const quoteId = (val: string) => {
     return `"${val}"`;
 };
 
+/**
+ * Splits a possibly schema-qualified object name into its parts.
+ *
+ * A dot is unambiguously a separator here: Kinetica rejects a dot inside an object
+ * name ("valid characters are letters, numbers, or '_-(){}[] #:'"), so anything before
+ * the first dot is a schema. `fallbackSchema` is used only for a bare name.
+ */
+export const splitQualifiedName = (
+    name: string,
+    fallbackSchema?: string
+): { schema: string; table: string } => {
+    const raw = (name ?? '').replace(/"/g, '');
+    if (!raw) {
+        return { schema: fallbackSchema ?? '', table: '' };
+    }
+    const dot = raw.indexOf('.');
+    if (dot === -1) {
+        return { schema: fallbackSchema ?? '', table: raw };
+    }
+    return { schema: raw.slice(0, dot), table: raw.slice(dot + 1) };
+};
+
 // Helper: Escape single quotes in string values for SQL
 export const escapeStringValue = (val: string): string => {
     return val.replace(/'/g, "''");
@@ -101,11 +123,10 @@ function generateSingleSelect(builder: KineticaQueryBuilder): string {
       builder.joins.forEach(j => {
           if (j.table) {
               const type = j.type || 'JOIN';
-              let jSchema = j.schema || finalSchema;
-              let jTable = j.table;
-              if (jSchema && jTable.startsWith(`${jSchema}.`)) {
-                  jTable = jTable.substring(jSchema.length + 1);
-              }
+              // A qualified join table names its own schema, which may differ from the
+              // base table's. Prefixing the base schema onto it produced a table name
+              // with a dot in it ("prod"."other.events") rather than a cross-schema join.
+              const { schema: jSchema, table: jTable } = splitQualifiedName(j.table, j.schema || finalSchema);
               const quotedJoinTable = `"${jSchema}"."${jTable}"`;
               const alias = j.alias ? ` AS "${j.alias}"` : '';
               

@@ -14,7 +14,7 @@ import { Observable, lastValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 
 import { KineticaDataSourceOptions, KineticaQuery, KineticaVariableQuery, defaultQuery } from './types';
-import { escapeStringValue } from './sqlGenerator';
+import { escapeStringValue, splitQualifiedName } from './sqlGenerator';
 import { KineticaVariableSupport } from './variables';
 
 // Result type for resource fetches that includes error information
@@ -362,9 +362,13 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
   // 3. Get Columns
   async getColumns(schema: string | undefined, tableName: string): Promise<ResourceFetchResult<string[]>> {
     try {
-      const params: Record<string, string> = { table: tableName };
-      if (schema) {
-        params.schema = schema;
+      // A qualified name carries its own schema, which may differ from the one passed
+      // in (a join against another schema). Sending both made the backend join them
+      // into "outer.other.events".
+      const { schema: effectiveSchema, table } = splitQualifiedName(tableName, schema);
+      const params: Record<string, string> = { table };
+      if (effectiveSchema) {
+        params.schema = effectiveSchema;
       }
       const result = await this.getResource('columns', params);
       return { data: Array.isArray(result) ? result : [] };

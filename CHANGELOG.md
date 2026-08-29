@@ -38,6 +38,10 @@ version numbers here are not contiguous.
 - Kinetica `date` and `datetime` columns are now plotted as time series; previously only
   `timestamp` columns were, and the others arrived as text.
 
+### Fixed
+- A join against a table in another schema now generates the correct SQL. The base
+  table's schema was applied to it instead, producing an invalid table name.
+
 ### Changed
 - Transitive dependencies for security issues:
   - `react-use` 17.6.0 -> 17.6.1, which moved `js-cookie` 2.2.1 -> 3.0.8 (GHSA-qjx8-664m-686j).

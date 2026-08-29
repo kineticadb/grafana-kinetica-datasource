@@ -332,3 +332,29 @@ describe('variableIdentifierOptions', () => {
     expect(variableIdentifierOptions()[0].description).toBe('currently prod');
   });
 });
+
+describe('DataSource.getColumns', () => {
+  let getResource: jest.Mock;
+
+  beforeEach(() => {
+    getResource = jest.fn().mockResolvedValue([]);
+    (ds as unknown as { getResource: jest.Mock }).getResource = getResource;
+  });
+
+  it('uses the schema carried by a qualified table name', async () => {
+    // Regression: the passed-in schema used to be prefixed onto the qualified name,
+    // so a join against another schema looked up "prod.other.events".
+    await ds.getColumns('prod', 'other.events');
+    expect(getResource).toHaveBeenCalledWith('columns', { table: 'events', schema: 'other' });
+  });
+
+  it('falls back to the passed-in schema for a bare table name', async () => {
+    await ds.getColumns('prod', 'events');
+    expect(getResource).toHaveBeenCalledWith('columns', { table: 'events', schema: 'prod' });
+  });
+
+  it('omits the schema when neither the name nor the caller supplies one', async () => {
+    await ds.getColumns(undefined, 'events');
+    expect(getResource).toHaveBeenCalledWith('columns', { table: 'events' });
+  });
+});
