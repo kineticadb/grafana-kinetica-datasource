@@ -11,6 +11,32 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
+## [1.0.12] - <TBD> - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
+
+### Added
+- Dashboard variables of type *Query* can now be populated from Kinetica. The datasource
+  implements `metricFindQuery` and registers a variable query editor, so the SQL can be
+  entered directly on the variable.
+  - A single result column supplies both the label and the value.
+  - `__text` / `__value` columns display one thing and store another, matching the
+    convention used by Grafana's other SQL datasources.
+  - Variable queries run through the normal query path, so backend macros still expand
+    and one variable query may reference another (chained variables).
+- `$__timeGroup(column, interval)` macro, for bucketing a time column in a `GROUP BY`.
+  - Accepts `500ms`, `30s`, `5m`, `1h`, `7d`, `2w`, quoted or bare, a plain number of
+    milliseconds, and Grafana's `$__interval`.
+  - The macro's alias is registered as a time column, so the bucket is returned as a
+    Grafana time field rather than a number and panels render as time series.
+- `parseToFrame` now converts Kinetica's string-backed `date` / `datetime` columns to
+  timestamps. Previously only integer `timestamp` columns became time fields, so a
+  `datetime` column arrived as text and could not be plotted.
+
+### Changed
+- Transitive dependencies for security issues:
+  - `react-use` 17.6.0 -> 17.6.1, which moved `js-cookie` 2.2.1 -> 3.0.8 (GHSA-qjx8-664m-686j).
+  - `immutable` 5.1.4 -> 5.1.9 (GHSA-v56q-mh7h-f735, GHSA-wf6x-7x77-mvgw, GHSA-xvcm-6775-5m9r).
+
+
 ## [1.0.11] - 2026-08-24 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.11
 
 ### Changed

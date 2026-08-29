@@ -1,10 +1,21 @@
-import { DataSourceInstanceSettings, CoreApp, DataQueryRequest, DataQueryResponse, DataFrame, ScopedVars } from '@grafana/data';
+import {
+  DataSourceInstanceSettings,
+  CoreApp,
+  DataQueryRequest,
+  DataQueryResponse,
+  DataFrame,
+  ScopedVars,
+  MetricFindValue,
+  LegacyMetricFindQueryOptions,
+  getDefaultTimeRange,
+} from '@grafana/data';
 import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
-import { Observable } from 'rxjs';
+import { Observable, lastValueFrom } from 'rxjs';
 import { map } from 'rxjs/operators';
 
-import { KineticaDataSourceOptions, KineticaQuery, defaultQuery } from './types';
+import { KineticaDataSourceOptions, KineticaQuery, KineticaVariableQuery, defaultQuery } from './types';
 import { escapeStringValue } from './sqlGenerator';
+import { KineticaVariableSupport } from './variables';
 
 // Result type for resource fetches that includes error information
 export interface ResourceFetchResult<T> {
@@ -39,9 +50,65 @@ export function interpolateSqlVariable(value: unknown, variable?: { multi?: bool
   return value;
 }
 
+// refId used for the synthetic request behind a variable query. Variable queries
+// have no panel target of their own, but the backend still keys results by refId.
+const VARIABLE_REF_ID = 'metricFindQuery';
+
+// Grafana's backendSrv cancels an in-flight request as soon as another one is
+// issued with the same requestId. A dashboard resolves its variable queries
+// concurrently, so a constant requestId makes each variable cancel the previous
+// one and only the last survives. Counter guarantees uniqueness when the caller
+// does not identify the variable.
+let variableRequestSeq = 0;
+
+function metricFindText(value: unknown): string {
+  return value === null || value === undefined ? '' : String(value);
+}
+
+/**
+ * Converts the first frame of a variable query into Grafana's MetricFindValue list.
+ *
+ * Follows the column convention used by Grafana's own SQL datasources: when the
+ * result carries both a `__text` and a `__value` column they become the displayed
+ * label and the stored value; otherwise the first column supplies both. Both are
+ * required for the pair to apply, because a lone `__text` would silently discard
+ * the value the user meant the variable to hold.
+ *
+ * Note the backend sorts columns alphabetically in `parseToFrame`, so these are
+ * looked up by name rather than by position.
+ */
+export function frameToMetricFindValues(frame?: DataFrame): MetricFindValue[] {
+  const fields = frame?.fields;
+  if (!fields || fields.length === 0) {
+    return [];
+  }
+
+  const textField = fields.find((f) => f.name === '__text');
+  const valueField = fields.find((f) => f.name === '__value');
+
+  if (textField && valueField) {
+    const count = Math.min(textField.values.length, valueField.values.length);
+    const values: MetricFindValue[] = [];
+    for (let i = 0; i < count; i++) {
+      const rawValue = valueField.values[i];
+      values.push({
+        text: metricFindText(textField.values[i]),
+        // Numbers are kept as numbers so numeric variables compare correctly.
+        value: typeof rawValue === 'number' ? rawValue : metricFindText(rawValue),
+      });
+    }
+    return values;
+  }
+
+  return (fields[0].values ?? []).map((value: unknown) => ({ text: metricFindText(value) }));
+}
+
 export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<KineticaDataSourceOptions>) {
     super(instanceSettings);
+    // Registers the variable query editor; replaces the deprecated
+    // DataSourcePlugin.setVariableQueryEditor().
+    this.variables = new KineticaVariableSupport(this);
   }
 
   getDefaultQuery(app: CoreApp): Partial<KineticaQuery> {
@@ -74,6 +141,42 @@ export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDat
     }
 
     return interpolated;
+  }
+
+  /**
+   * Populates a dashboard variable of type *Query* from a Kinetica query.
+   *
+   * The SQL is run through the normal query path rather than a bespoke request, so
+   * backend macros still expand and `applyTemplateVariables` still runs — the latter
+   * is what makes chained variables (one variable query referencing another) work.
+   *
+   * Accepts a bare string as well as a `KineticaVariableQuery` so that variables
+   * saved before the query editor existed, and provisioned dashboards that store the
+   * query as a string, keep working.
+   */
+  async metricFindQuery(
+    query: Partial<KineticaVariableQuery> | string,
+    options?: LegacyMetricFindQueryOptions
+  ): Promise<MetricFindValue[]> {
+    const rawSql = (typeof query === 'string' ? query : query?.rawSql) ?? '';
+    if (!rawSql.trim()) {
+      return [];
+    }
+
+    const request = {
+      requestId: `${this.uid}-${VARIABLE_REF_ID}-${options?.variable?.name ?? `q${++variableRequestSeq}`}`,
+      interval: '',
+      intervalMs: 0,
+      range: options?.range ?? getDefaultTimeRange(),
+      scopedVars: options?.scopedVars ?? {},
+      targets: [{ refId: VARIABLE_REF_ID, rawSql }],
+      timezone: 'browser',
+      app: CoreApp.Dashboard,
+      startTime: Date.now(),
+    } as DataQueryRequest<KineticaQuery>;
+
+    const response = await lastValueFrom(this.query(request));
+    return frameToMetricFindValues(response?.data?.[0] as DataFrame | undefined);
   }
 
   // Intercept the query response to fix column ordering

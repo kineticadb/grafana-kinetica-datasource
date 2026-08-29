@@ -130,6 +130,7 @@ These macros are expanded by the plugin backend before the query reaches Kinetic
 | `$__timeTo()` | End of the selected time range |
 | `$__unixEpochFrom()` | Start of the selected time range, as a Unix epoch value |
 | `$__unixEpochTo()` | End of the selected time range, as a Unix epoch value |
+| `$__timeGroup(column, interval)` | Rounds a time column down to interval boundaries, for `GROUP BY`. Accepts `30s`, `5m`, `1h`, `7d`, `500ms`, quoted or bare, and `$__interval`. Expands to Kinetica's `TIME_BUCKET`, and the aliased result is typed as a time field so Grafana draws a time series. |
 
 ### Template variables
 
@@ -153,17 +154,33 @@ the backend, in both raw SQL and query-builder modes.
 Variables used for the builder's **Schema** and **Table** fields are interpolated too,
 which keeps the backend's time-column detection working when the table name is dynamic.
 
+### Query variables
+
+A dashboard variable of type *Query* can be populated from Kinetica. Select the Kinetica
+datasource on the variable and enter SQL that returns one row per value:
+
+```sql
+SELECT DISTINCT host FROM prod.sensors ORDER BY host
+```
+
+- **One column** supplies both the displayed label and the stored value.
+- **Two columns named `__text` and `__value`** display one thing and store another, the
+  same convention Grafana's other SQL datasources use:
+
+  ```sql
+  SELECT name AS __text, id AS __value FROM prod.hosts ORDER BY name
+  ```
+
+  Both columns must be present for this to apply; a lone `__text` is treated as an
+  ordinary single column. Other columns are ignored.
+- Variable queries go through the same path as panel queries, so the backend macros in
+  the table above work, and one variable query may reference another variable
+  (chained variables).
+- Values are returned as the query produces them — use `DISTINCT` and `ORDER BY` if you
+  want them deduplicated or sorted.
+
 ## Known limitations
 
-- **No `$__timeGroup` macro.** Time bucketing must be written explicitly in SQL. The
-  backend implements only the five macros listed above; `$__timeGroup` is not among them.
-  (`$__from` and `$__to` do work, but as Grafana built-in variables resolved during
-  template interpolation, not as backend macros.)
-- **Dashboard variables cannot be *defined* by a Kinetica query.** Variable values are
-  interpolated into queries (see **Template variables** above), but the datasource does
-  not implement `metricFindQuery`, so a dashboard variable of type *Query* cannot be
-  populated from Kinetica. Use a *Custom* variable, or populate it from another
-  datasource.
 - **In raw SQL mode, result columns come back in alphabetical order**, not in the order
   you wrote them in `SELECT`. The backend sorts column names before building the frame
   (`sort.Strings` in `parseToFrame`), and the frontend restores your order only when the
@@ -175,8 +192,10 @@ which keeps the backend's time-column detection working when the table name is d
   field for it in the editor UI.
 - **Metadata calls are uncached.** Every schema, table, and column dropdown triggers a
   live database call.
-- **The E2E suite covers 7 stable scenarios** (alerts, provisioning, basic page loads),
+- **The E2E suite covers 7 scenarios in CI** (alerts, provisioning, basic page loads),
   narrowed from an initial 34 so it passes reliably across supported Grafana versions.
+  Three further tests cover *Query* variables end to end but need a live Kinetica, so
+  they self-skip in CI and only run against a local `docker compose` environment.
   See [`E2E_TESTS_README.md`](E2E_TESTS_README.md).
 - Query errors surfaced in the Grafana UI are intentionally generic; the detail is written
   to the Grafana server log. Enable backend debug logging with
