@@ -103,6 +103,65 @@ export function frameToMetricFindValues(frame?: DataFrame): MetricFindValue[] {
   return (fields[0].values ?? []).map((value: unknown) => ({ text: metricFindText(value) }));
 }
 
+/**
+ * Resolves a template variable used as a SQL identifier, for the query builder's
+ * schema/table/column metadata lookups.
+ *
+ * `applyTemplateVariables` already does this for the query itself, but the builder's
+ * dropdowns call the resource endpoints directly, so an uninterpolated `$schema`
+ * reaches Kinetica and comes back as "Invalid table name".
+ *
+ * Identifiers are single-valued by nature. A multi-value variable interpolates as
+ * `{a,b}`, which cannot name a table, so the first entry is used instead of sending
+ * a name that is guaranteed not to exist. `unresolved` reports a value that still
+ * contains a `$` after interpolation -- an undefined variable -- so the caller can
+ * say so rather than surfacing a generic backend failure.
+ */
+export function resolveIdentifier(value: string | undefined): { name: string; unresolved: boolean } {
+  const raw = (value ?? '').trim();
+  if (!raw) {
+    return { name: '', unresolved: false };
+  }
+
+  let name = getTemplateSrv().replace(raw);
+
+  const multiValue = name.match(/^\{(.*)\}$/);
+  if (multiValue) {
+    name = (multiValue[1].split(',')[0] ?? '').trim();
+  }
+
+  return { name, unresolved: name.includes('$') };
+}
+
+/**
+ * Dashboard variables offered as choices in the builder's identifier dropdowns.
+ *
+ * Without these a variable can only be used by typing `$name` into a dropdown that
+ * lists nothing but table names -- undiscoverable, and the control then renders blank
+ * because the stored value matches no option. The description reports what the
+ * variable currently resolves to, which is the thing worth seeing when one drives a
+ * picker; the variable reference itself is what gets stored, never its current value.
+ */
+export function variableIdentifierOptions(): Array<{
+  label: string;
+  value: string;
+  group: string;
+  description: string;
+}> {
+  return getTemplateSrv()
+    .getVariables()
+    .map((variable) => {
+      const reference = `$${variable.name}`;
+      const resolved = resolveIdentifier(reference);
+      return {
+        label: reference,
+        value: reference,
+        group: 'Variables',
+        description: resolved.unresolved ? 'no current value' : `currently ${resolved.name}`,
+      };
+    });
+}
+
 export class DataSource extends DataSourceWithBackend<KineticaQuery, KineticaDataSourceOptions> {
   constructor(instanceSettings: DataSourceInstanceSettings<KineticaDataSourceOptions>) {
     super(instanceSettings);

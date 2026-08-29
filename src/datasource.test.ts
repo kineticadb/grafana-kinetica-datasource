@@ -2,16 +2,23 @@ import { DataFrame, ScopedVars, TimeRange } from '@grafana/data';
 import { of } from 'rxjs';
 
 const replaceMock = jest.fn();
+const getVariablesMock = jest.fn(() => [] as Array<{ name: string }>);
 
 jest.mock('@grafana/runtime', () => ({
   // datasource.ts extends this at import time, so a stub is required.
   DataSourceWithBackend: class {
     constructor(_settings: unknown) {}
   },
-  getTemplateSrv: () => ({ replace: replaceMock }),
+  getTemplateSrv: () => ({ replace: replaceMock, getVariables: getVariablesMock }),
 }));
 
-import { DataSource, interpolateSqlVariable, frameToMetricFindValues } from './datasource';
+import {
+  DataSource,
+  interpolateSqlVariable,
+  frameToMetricFindValues,
+  resolveIdentifier,
+  variableIdentifierOptions,
+} from './datasource';
 import { KineticaQuery } from './types';
 
 // Build an instance without running DataSourceWithBackend's constructor.
@@ -247,5 +254,81 @@ describe('DataSource.metricFindQuery', () => {
   it('returns an empty list when the response carries no frames', async () => {
     querySpy.mockReturnValue(of({ data: [] }));
     await expect(ds.metricFindQuery({ rawSql: 'SELECT 1' })).resolves.toEqual([]);
+  });
+});
+
+describe('resolveIdentifier', () => {
+  beforeEach(() => {
+    replaceMock.mockReset();
+  });
+
+  it('returns an empty name for a blank value without calling the template service', () => {
+    expect(resolveIdentifier(undefined)).toEqual({ name: '', unresolved: false });
+    expect(resolveIdentifier('   ')).toEqual({ name: '', unresolved: false });
+    expect(replaceMock).not.toHaveBeenCalled();
+  });
+
+  it('passes a literal identifier through unchanged', () => {
+    replaceMock.mockImplementation((v: string) => v);
+    expect(resolveIdentifier('prod')).toEqual({ name: 'prod', unresolved: false });
+  });
+
+  it('interpolates a variable to its value', () => {
+    replaceMock.mockImplementation(() => 'prod');
+    expect(resolveIdentifier('$schema')).toEqual({ name: 'prod', unresolved: false });
+  });
+
+  it('takes the first entry of a multi-value variable', () => {
+    // A multi-value variable interpolates as {a,b}, which cannot name a table.
+    replaceMock.mockImplementation(() => '{prod,staging}');
+    expect(resolveIdentifier('$schema')).toEqual({ name: 'prod', unresolved: false });
+  });
+
+  it('flags a variable that did not resolve', () => {
+    // Grafana leaves an unknown variable in place rather than erroring.
+    replaceMock.mockImplementation((v: string) => v);
+    expect(resolveIdentifier('$nope')).toEqual({ name: '$nope', unresolved: true });
+  });
+
+  it('trims surrounding whitespace before interpolating', () => {
+    replaceMock.mockImplementation((v: string) => v);
+    expect(resolveIdentifier('  prod  ').name).toBe('prod');
+    expect(replaceMock).toHaveBeenCalledWith('prod');
+  });
+});
+
+describe('variableIdentifierOptions', () => {
+  beforeEach(() => {
+    replaceMock.mockReset();
+    getVariablesMock.mockReset();
+  });
+
+  it('returns nothing when the dashboard has no variables', () => {
+    getVariablesMock.mockReturnValue([]);
+    expect(variableIdentifierOptions()).toEqual([]);
+  });
+
+  it('offers each variable as a pickable option that stores the reference, not the value', () => {
+    getVariablesMock.mockReturnValue([{ name: 'schema' }, { name: 'tbl' }]);
+    replaceMock.mockImplementation((v: string) => (v === '$schema' ? 'prod' : 'events'));
+
+    expect(variableIdentifierOptions()).toEqual([
+      { label: '$schema', value: '$schema', group: 'Variables', description: 'currently prod' },
+      { label: '$tbl', value: '$tbl', group: 'Variables', description: 'currently events' },
+    ]);
+  });
+
+  it('reports a variable with no current value rather than showing a bare $name', () => {
+    getVariablesMock.mockReturnValue([{ name: 'nope' }]);
+    replaceMock.mockImplementation((v: string) => v);
+
+    expect(variableIdentifierOptions()[0].description).toBe('no current value');
+  });
+
+  it('describes a multi-value variable by its first entry, matching what a lookup would use', () => {
+    getVariablesMock.mockReturnValue([{ name: 'schema' }]);
+    replaceMock.mockImplementation(() => '{prod,staging}');
+
+    expect(variableIdentifierOptions()[0].description).toBe('currently prod');
   });
 });

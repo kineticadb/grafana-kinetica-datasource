@@ -14,22 +14,29 @@ version numbers here are not contiguous.
 ## [1.0.12] - <TBD> - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
 
 ### Added
-- Dashboard variables of type *Query* can now be populated from Kinetica. The datasource
-  implements `metricFindQuery` and registers a variable query editor, so the SQL can be
-  entered directly on the variable.
+- Dashboard variables of type *Query* can now be populated from Kinetica. Select the
+  Kinetica datasource on the variable and enter SQL returning one row per value.
   - A single result column supplies both the label and the value.
   - `__text` / `__value` columns display one thing and store another, matching the
     convention used by Grafana's other SQL datasources.
-  - Variable queries run through the normal query path, so backend macros still expand
-    and one variable query may reference another (chained variables).
+  - Backend macros work in a variable query, and one variable query may reference
+    another (chained variables).
 - `$__timeGroup(column, interval)` macro, for bucketing a time column in a `GROUP BY`.
+  Panels render the bucketed column as a time series.
   - Accepts `500ms`, `30s`, `5m`, `1h`, `7d`, `2w`, quoted or bare, a plain number of
     milliseconds, and Grafana's `$__interval`.
-  - The macro's alias is registered as a time column, so the bucket is returned as a
-    Grafana time field rather than a number and panels render as time series.
-- `parseToFrame` now converts Kinetica's string-backed `date` / `datetime` columns to
-  timestamps. Previously only integer `timestamp` columns became time fields, so a
-  `datetime` column arrived as text and could not be plotted.
+- The query builder's Schema, Table and Column dropdowns now work when Schema or Table
+  is set to a dashboard variable.
+  - Changing the variable's value re-populates the dropdowns.
+  - Dashboard variables are offered as choices in the Schema, Table and Join Table
+    dropdowns, grouped above the fetched names and labelled with what each currently
+    resolves to (`$schema - currently ki_catalog`). Selecting one stores the variable,
+    not its current value.
+  - Those dropdowns also accept a typed-in name.
+  - A multi-value variable uses its first value.
+  - A variable with no value is reported as such instead of an unexplained failure.
+- Kinetica `date` and `datetime` columns are now plotted as time series; previously only
+  `timestamp` columns were, and the others arrived as text.
 
 ### Changed
 - Transitive dependencies for security issues:

@@ -1,18 +1,27 @@
 {
   "uid": "kinetica-var-smoke",
   "title": "Kinetica Variable Smoke Test",
-  "tags": ["kinetica", "variables"],
+  "tags": [
+    "kinetica",
+    "variables"
+  ],
   "schemaVersion": 39,
   "version": 1,
   "editable": true,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
         "name": "schema",
         "label": "Schema",
         "type": "query",
-        "datasource": { "type": "kinetica-grafana-datasource", "uid": "kinetica-grafana-datasource-test" },
+        "datasource": {
+          "type": "kinetica-grafana-datasource",
+          "uid": "kinetica-grafana-datasource-test"
+        },
         "query": {
           "refId": "variable",
           "rawSql": "SELECT schema_name FROM ki_catalog.ki_schemas ORDER BY schema_name"
@@ -28,7 +37,10 @@
         "name": "col",
         "label": "Column",
         "type": "query",
-        "datasource": { "type": "kinetica-grafana-datasource", "uid": "kinetica-grafana-datasource-test" },
+        "datasource": {
+          "type": "kinetica-grafana-datasource",
+          "uid": "kinetica-grafana-datasource-test"
+        },
         "query": {
           "refId": "variable",
           "rawSql": "SELECT column_name AS __text, column_position AS __value FROM ki_catalog.ki_columns WHERE table_name = 'ki_schemas' ORDER BY column_position"
@@ -47,14 +59,57 @@
       "id": 1,
       "type": "table",
       "title": "Tables in $schema",
-      "datasource": { "type": "kinetica-grafana-datasource", "uid": "kinetica-grafana-datasource-test" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "kinetica-grafana-datasource-test"
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "targets": [
         {
           "refId": "A",
-          "datasource": { "type": "kinetica-grafana-datasource", "uid": "kinetica-grafana-datasource-test" },
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "kinetica-grafana-datasource-test"
+          },
           "rawSql": "SELECT DISTINCT table_name FROM ki_catalog.ki_columns WHERE schema_name = '$schema' ORDER BY table_name LIMIT 20",
           "format": "table"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Builder driven by $schema",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "kinetica-grafana-datasource-test"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "kinetica-grafana-datasource-test"
+          },
+          "format": "table",
+          "rawSql": "SELECT * FROM \"$schema\".\"ki_schemas\" LIMIT 5",
+          "builder": {
+            "schema": "$schema",
+            "table": "$schema.ki_schemas",
+            "selects": [],
+            "limit": 5
+          }
         }
       ]
     }

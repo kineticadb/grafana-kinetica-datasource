@@ -14,7 +14,7 @@ import {
 } from '@grafana/ui';
 import { QueryEditorProps, GrafanaTheme2 } from '@grafana/data';
 import { css } from '@emotion/css';
-import { DataSource } from '../datasource';
+import { DataSource, resolveIdentifier, variableIdentifierOptions } from '../datasource';
 import {
   KineticaQuery,
   KineticaDataSourceOptions,
@@ -203,6 +203,50 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   const [allColumnOptions, setAllColumnOptions] = useState<RichColumnOption[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
+  // Resolved during render rather than memoised on the raw strings: a dashboard
+  // variable's *value* can change while `builder.schema` stays "$schema", so anything
+  // keyed on the raw text would never re-fetch and the dropdowns would go stale.
+  // Recomputing every render keeps the effect dependencies below honest.
+  const resolvedSchema = resolveIdentifier(builder.schema);
+  const resolvedTable = resolveIdentifier(builder.table);
+  // Every table the column dropdown needs, with schema/table already interpolated.
+  // Aliases keep the *raw* name so the labels match the SQL the builder generates.
+  const columnSources = [
+    ...(builder.table
+      ? [{
+          schema: resolvedSchema.name,
+          table: resolvedTable.name,
+          alias: (builder.alias && builder.alias.trim() !== '') ? builder.alias : getSimpleTableName(builder.table),
+          index: 0,
+          raw: builder.table,
+        }]
+      : []),
+    ...(builder.joins ?? []).flatMap((j, idx) => j.table
+      ? [{
+          schema: resolveIdentifier(j.schema || builder.schema).name,
+          table: resolveIdentifier(j.table).name,
+          alias: (j.alias && j.alias.trim() !== '') ? j.alias : getSimpleTableName(j.table),
+          index: idx + 1,
+          raw: j.table,
+        }]
+      : []),
+  ];
+  const columnSourceKey = JSON.stringify(columnSources.map((c) => [c.schema, c.table, c.alias]));
+  const unresolvedName = [builder.schema, builder.table, ...(builder.joins ?? []).map((j) => j.table)]
+    .find((v) => v && resolveIdentifier(v).unresolved);
+  // Derived rather than pushed into state from an effect: the condition is a pure
+  // function of the current props, and setState inside an effect is disallowed here.
+  const variableError = unresolvedName
+    ? `Variable "${unresolvedName}" has no value, so tables and columns cannot be listed.`
+    : null;
+
+  // Dashboard variables are offered alongside the fetched names so they can be picked
+  // rather than typed blind, and so a stored "$var" still renders instead of showing an
+  // empty control. Grouping keeps them distinct from a real object of the same name.
+  const variableOptions = variableIdentifierOptions();
+  const schemaSelectOptions = [...variableOptions, ...schemaOptions.map((o) => ({ ...o, group: 'Schemas' }))];
+  const tableSelectOptions = [...variableOptions, ...tableOptions.map((o) => ({ ...o, group: 'Tables' }))];
+
   useEffect(() => {
     let isMounted = true;
     datasource.getSchemas()
@@ -225,11 +269,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
 
   useEffect(() => {
     let isMounted = true;
-    if (builder.schema) {
-      datasource.getTableNames(builder.schema)
+    if (!resolvedSchema.unresolved && resolvedSchema.name) {
+      datasource.getTableNames(resolvedSchema.name)
         .then((result) => {
           if (isMounted) {
-            const prefix = `${builder.schema}.`;
+            const prefix = `${resolvedSchema.name}.`;
             const cleanOptions = result.data.map((v) => {
                const label = v.startsWith(prefix) ? v.substring(prefix.length) : v;
                return { label: label, value: v };
@@ -248,7 +292,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
         });
     }
     return () => { isMounted = false; };
-  }, [datasource, builder.schema]);
+  }, [datasource, builder.schema, resolvedSchema.name, resolvedSchema.unresolved]);
 
   const aliasError = useMemo(() => {
       const aliases = new Set<string>();
@@ -269,21 +313,8 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   useEffect(() => {
     let isMounted = true;
     const fetchAllColumns = async () => {
-        const sources = [];
-        if (builder.table) {
-            const simpleName = getSimpleTableName(builder.table);
-            const effectiveAlias = (builder.alias && builder.alias.trim() !== '') ? builder.alias : simpleName;
-            sources.push({ schema: builder.schema, table: builder.table, alias: effectiveAlias, index: 0 });
-        }
-        if (builder.joins) {
-            builder.joins.forEach((j, idx) => {
-                if (j.table) {
-                    const simpleName = getSimpleTableName(j.table);
-                    const effectiveAlias = (j.alias && j.alias.trim() !== '') ? j.alias : simpleName;
-                    sources.push({ schema: j.schema || builder.schema, table: j.table, alias: effectiveAlias, index: idx + 1 });
-                }
-            });
-        }
+        if (unresolvedName) { return; }
+        const sources = columnSources;
         if (sources.length === 0) { if (isMounted) {setAllColumnOptions([]);} return; }
         try {
             const results = await Promise.all(sources.map(async (src) => {
@@ -303,7 +334,9 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
     };
     fetchAllColumns();
     return () => { isMounted = false; };
-  }, [datasource, builder.schema, builder.table, builder.alias, builder.joins]);
+    // columnSources is rebuilt every render; the serialised key is what actually changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [datasource, columnSourceKey, unresolvedName]);
 
   const combinedOptions = useMemo(() => {
     const aliasedRawColumns = new Set<string>();
@@ -427,16 +460,16 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   return (
     <div className={styles.builderContainer}>
       {isRoot && <h5 className={styles.builderTitle}>SQL Builder</h5>}
-      {fetchError && (
+      {(variableError ?? fetchError) && (
         <Alert title="Connection Error" severity="warning" className={styles.alertMargin} onRemove={clearFetchError}>
-          {fetchError}
+          {variableError ?? fetchError}
         </Alert>
       )}
       {aliasError && <Alert title="Validation Error" severity="error" className={styles.alertMargin}>{String(aliasError)}</Alert>}
 
       <Stack direction="row" gap={1}>
-        <Field label="Schema"><Combobox options={schemaOptions} value={builder.schema || null} onChange={v => onSchemaChange(v?.value ?? '')} width={25} /></Field>
-        <div className={styles.flexGrow}><Field label="Table"><Combobox options={tableOptions} value={builder.table || null} onChange={v => onTableChange(v?.value ?? '')} /></Field></div>
+        <Field label="Schema"><Combobox options={schemaSelectOptions} value={builder.schema || null} onChange={v => onSchemaChange(v?.value ?? '')} width={25} createCustomValue /></Field>
+        <div className={styles.flexGrow}><Field label="Table"><Combobox options={tableSelectOptions} value={builder.table || null} onChange={v => onTableChange(v?.value ?? '')} createCustomValue /></Field></div>
         <Field label="Alias"><Input value={builder.alias || ''} onChange={e => update('alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
         <Field label="Distinct"><Switch value={builder.distinct ?? false} onChange={e => update('distinct', e.currentTarget.checked)} /></Field>
       </Stack>
@@ -480,7 +513,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             <div key={i} className={styles.joinContainer}>
               <Stack direction="row" gap={1}>
                 <Field label={i === 0 ? 'Type' : ''}><Combobox options={JOIN_TYPES} value={j.type || null} onChange={v => updateJoin(i, 'type', v?.value)} width={20} /></Field>
-                <div className={styles.flexGrow}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} /></Field></div>
+                <div className={styles.flexGrow}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableSelectOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} createCustomValue /></Field></div>
                 <Field label={i === 0 ? 'Alias' : ''}><Input value={j.alias || ''} onChange={e => updateJoin(i, 'alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
                 <div className={i === 0 ? styles.iconButtonTopMargin : styles.iconButtonNoMargin}><IconButton name="trash-alt" variant="secondary" aria-label="Remove Join" onClick={() => removeJoin(i)} /></div>
               </Stack>
