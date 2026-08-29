@@ -199,7 +199,9 @@ interface BuilderFormProps {
 const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange, isRoot }) => {
   const styles = useStyles2(getStyles);
   const [schemaOptions, setSchemaOptions] = useState<Array<{ label: string; value: string }>>([]);
-  const [tableOptions, setTableOptions] = useState<Array<{ label: string; value: string }>>([]);
+  // Keyed by schema: a query can reference several (the base table plus joins against
+  // other schemas), and one shared list would offer the base schema's tables everywhere.
+  const [tablesBySchema, setTablesBySchema] = useState<Record<string, Array<{ label: string; value: string }>>>({});
   const [allColumnOptions, setAllColumnOptions] = useState<RichColumnOption[]>([]);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -232,6 +234,11 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
       : []),
   ];
   const columnSourceKey = JSON.stringify(columnSources.map((c) => [c.schema, c.table, c.alias]));
+  // A join with no schema of its own inherits the base table's.
+  const joinSchemas = (builder.joins ?? []).map((j) => resolveIdentifier(j.schema || builder.schema).name);
+  const neededSchemas = Array.from(new Set([resolvedSchema.name, ...joinSchemas].filter(Boolean)));
+  const neededSchemasKey = neededSchemas.join('|');
+  const tableOptionsFor = (schema: string) => tablesBySchema[schema] ?? [];
   const unresolvedName = [builder.schema, builder.table, ...(builder.joins ?? []).map((j) => j.table)]
     .find((v) => v && resolveIdentifier(v).unresolved);
   // Derived rather than pushed into state from an effect: the condition is a pure
@@ -245,7 +252,9 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   // empty control. Grouping keeps them distinct from a real object of the same name.
   const variableOptions = variableIdentifierOptions();
   const schemaSelectOptions = [...variableOptions, ...schemaOptions.map((o) => ({ ...o, group: 'Schemas' }))];
-  const tableSelectOptions = [...variableOptions, ...tableOptions.map((o) => ({ ...o, group: 'Tables' }))];
+  const tableSelectOptionsFor = (schema: string) =>
+    [...variableOptions, ...tableOptionsFor(schema).map((o) => ({ ...o, group: 'Tables' }))];
+  const tableSelectOptions = tableSelectOptionsFor(resolvedSchema.name);
 
   useEffect(() => {
     let isMounted = true;
@@ -269,30 +278,40 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
 
   useEffect(() => {
     let isMounted = true;
-    if (!resolvedSchema.unresolved && resolvedSchema.name) {
-      datasource.getTableNames(resolvedSchema.name)
-        .then((result) => {
+    const schemas = neededSchemasKey ? neededSchemasKey.split('|') : [];
+    if (schemas.length > 0) {
+      Promise.all(
+        schemas.map(async (schema) => {
+          const result = await datasource.getTableNames(schema);
+          const prefix = `${schema}.`;
+          return {
+            schema,
+            error: result.error,
+            options: result.data.map((v) => ({
+              label: v.startsWith(prefix) ? v.substring(prefix.length) : v,
+              value: v,
+            })),
+          };
+        })
+      )
+        .then((results) => {
           if (isMounted) {
-            const prefix = `${resolvedSchema.name}.`;
-            const cleanOptions = result.data.map((v) => {
-               const label = v.startsWith(prefix) ? v.substring(prefix.length) : v;
-               return { label: label, value: v };
-            });
-            setTableOptions(cleanOptions);
-            if (result.error) {
-              setFetchError(result.error);
+            setTablesBySchema(Object.fromEntries(results.map((r) => [r.schema, r.options])));
+            const failed = results.find((r) => r.error);
+            if (failed?.error) {
+              setFetchError(failed.error);
             }
           }
         })
         .catch((err) => {
           if (isMounted) {
-            setTableOptions([]);
+            setTablesBySchema({});
             setFetchError(`Failed to fetch tables: ${err instanceof Error ? err.message : String(err)}`);
           }
         });
     }
     return () => { isMounted = false; };
-  }, [datasource, builder.schema, resolvedSchema.name, resolvedSchema.unresolved]);
+  }, [datasource, neededSchemasKey]);
 
   const aliasError = useMemo(() => {
       const aliases = new Set<string>();
@@ -350,7 +369,7 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   }, [builder.selects, allColumnOptions]);
 
   const update = (field: keyof KineticaQueryBuilder, val: any) => { onChange({ ...builder, [field]: val }); };
-  const onSchemaChange = (v: string) => { setTableOptions([]); setAllColumnOptions([]); onChange({ ...builder, schema: v, table: '', selects: [], joins: [], groupBy: [], orderBy: [] }); };
+  const onSchemaChange = (v: string) => { setTablesBySchema({}); setAllColumnOptions([]); onChange({ ...builder, schema: v, table: '', selects: [], joins: [], groupBy: [], orderBy: [] }); };
   const onTableChange = (v: string) => { setAllColumnOptions([]); onChange({ ...builder, table: v, selects: [], filters: [] }); };
 
   const updateSelect = (i: number, field: keyof KineticaSelect, val: string | undefined) => {
@@ -513,7 +532,8 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
             <div key={i} className={styles.joinContainer}>
               <Stack direction="row" gap={1}>
                 <Field label={i === 0 ? 'Type' : ''}><Combobox options={JOIN_TYPES} value={j.type || null} onChange={v => updateJoin(i, 'type', v?.value)} width={20} /></Field>
-                <div className={styles.flexGrow}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableSelectOptions} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} createCustomValue /></Field></div>
+                <Field label={i === 0 ? 'Join Schema' : ''}><Combobox options={schemaSelectOptions} value={j.schema || null} onChange={v => updateJoin(i, 'schema', v?.value ?? '')} width={22} placeholder={resolvedSchema.name || 'Base schema'} createCustomValue /></Field>
+                <div className={styles.flexGrow}><Field label={i === 0 ? 'Join Table' : ''}><Combobox options={tableSelectOptionsFor(joinSchemas[i])} value={j.table || null} onChange={v => updateJoin(i, 'table', v?.value)} createCustomValue /></Field></div>
                 <Field label={i === 0 ? 'Alias' : ''}><Input value={j.alias || ''} onChange={e => updateJoin(i, 'alias', e.currentTarget.value)} placeholder="Alias" width={10} /></Field>
                 <div className={i === 0 ? styles.iconButtonTopMargin : styles.iconButtonNoMargin}><IconButton name="trash-alt" variant="secondary" aria-label="Remove Join" onClick={() => removeJoin(i)} /></div>
               </Stack>

@@ -15,7 +15,7 @@ This document explains our E2E testing approach, which follows Grafana's best pr
 
 **Test Count**:
 - **7 passing tests in CI** (all stable)
-- **3 conditional tests** that need a live Kinetica and self-skip without one
+- **5 conditional tests** that need a live Kinetica and self-skip without one
 - **28+ skipped tests** (documented with reasons)
 
 **What's Tested**:
@@ -23,6 +23,7 @@ This document explains our E2E testing approach, which follows Grafana's best pr
 - ✅ Config editor (1 test) - Ultra-minimal page load check
 - ✅ Dashboard loads (1 test) - Verifies dashboard title appears
 - ✅ Query variables (3 tests) - Only with a live database; see below
+- ✅ Cross-schema joins (2 tests) - Only with a live database; see below
 
 **Recent Experiments (2026-04-17)**:
 - ❌ **Query Editor Tests**: Attempted to add 3 ultra-minimal tests using generic CSS selectors (avoiding @grafana/plugin-e2e library methods). Tests passed locally (10 total) but failed in actual use. All reverted. See `docs/QUERY_EDITOR_TEST_EXPERIMENT.md` for details.
@@ -207,6 +208,22 @@ version-specific selectors that forced the other UI tests to be skipped.
 unit tests with a mocked Grafana cannot cover it. Both bugs it caught - a shared
 `requestId` that made concurrent variable queries abort one another, and a DataFrame
 wrapper that discarded `__value` - passed every unit test.
+
+
+### ✅ joinQueries.spec.ts (2 tests, conditional)
+
+**What's tested**:
+- A builder join against a table in another schema returns rows
+- Each join has its own Schema dropdown, and its Table dropdown is populated from that
+  schema rather than the base table's
+
+**What's skipped**: Nothing, but both self-skip when the datasource health check fails,
+as in CI.
+
+**Why it works**: It drives the provisioned `Cross-schema join` panel and asserts on the
+resource requests the editor issues, not on Grafana's internal test IDs. The fixture
+joins `ki_catalog` to `information_schema`, both Kinetica system schemas, so it needs no
+seeded data.
 
 
 ## Manual Testing Checklist

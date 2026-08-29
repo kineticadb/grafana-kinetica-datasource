@@ -194,8 +194,9 @@ SELECT DISTINCT host FROM prod.sensors ORDER BY host
   live database call.
 - **The E2E suite covers 7 scenarios in CI** (alerts, provisioning, basic page loads),
   narrowed from an initial 34 so it passes reliably across supported Grafana versions.
-  Three further tests cover *Query* variables end to end but need a live Kinetica, so
-  they self-skip in CI and only run against a local `docker compose` environment.
+  Five further tests cover *Query* variables and cross-schema joins end to end but need
+  a live Kinetica, so they self-skip in CI and only run against a local `docker compose`
+  environment.
   See [`E2E_TESTS_README.md`](E2E_TESTS_README.md).
 - Query errors surfaced in the Grafana UI are intentionally generic; the detail is written
   to the Grafana server log. Enable backend debug logging with

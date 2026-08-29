@@ -112,6 +112,73 @@
           }
         }
       ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Cross-schema join",
+      "description": "Joins ki_catalog to information_schema. Exercises the builder's per-join schema handling; both are Kinetica system schemas so this works on any instance.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "kinetica-grafana-datasource-test"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "kinetica-grafana-datasource-test"
+          },
+          "format": "table",
+          "rawSql": "SELECT \"s\".\"schema_name\" AS \"schema\", \"i\".\"SCHEMA_OWNER\" AS \"owner\" FROM \"ki_catalog\".\"ki_schemas\" AS \"s\" INNER JOIN \"information_schema\".\"SCHEMATA\" AS \"i\" ON \"s\".\"schema_name\" = \"i\".\"SCHEMA_NAME\" ORDER BY \"s\".\"schema_name\" ASC LIMIT 10",
+          "builder": {
+            "schema": "ki_catalog",
+            "table": "ki_catalog.ki_schemas",
+            "alias": "s",
+            "selects": [
+              {
+                "column": "schema_name",
+                "table": "s",
+                "alias": "schema"
+              },
+              {
+                "column": "SCHEMA_OWNER",
+                "table": "i",
+                "alias": "owner"
+              }
+            ],
+            "joins": [
+              {
+                "type": "INNER",
+                "schema": "information_schema",
+                "table": "information_schema.SCHEMATA",
+                "alias": "i",
+                "conditions": [
+                  {
+                    "logic": "AND",
+                    "left": "s.schema_name",
+                    "operator": "=",
+                    "right": "i.SCHEMA_NAME"
+                  }
+                ]
+              }
+            ],
+            "orderBy": [
+              {
+                "column": "s.schema_name",
+                "direction": "ASC"
+              }
+            ],
+            "limit": 10
+          }
+        }
+      ]
     }
   ]
 }

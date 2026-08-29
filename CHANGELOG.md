@@ -35,6 +35,9 @@ version numbers here are not contiguous.
   - Those dropdowns also accept a typed-in name.
   - A multi-value variable uses its first value.
   - A variable with no value is reported as such instead of an unexplained failure.
+- Joins can target a table in another schema from the query builder. Each join now has
+  its own Schema dropdown, defaulting to the base table's, and its Table dropdown lists
+  that schema's tables.
 - Kinetica `date` and `datetime` columns are now plotted as time series; previously only
   `timestamp` columns were, and the others arrived as text.
 
