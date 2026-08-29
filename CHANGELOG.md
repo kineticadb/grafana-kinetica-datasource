@@ -11,7 +11,7 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
-## [1.0.12] - <TBD> - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
+## [1.0.12] - 2026-08-29 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
 
 ### Added
 - Dashboard variables of type *Query* can now be populated from Kinetica. Select the
