@@ -23,8 +23,12 @@ query builder or raw SQL, and display the results in Grafana panels.
   - Set operations: `UNION`, `UNION ALL`, `INTERSECT`, `INTERSECT ALL`, `EXCEPT`,
     `EXCEPT ALL`
 - **Raw SQL Mode** — write queries directly in a Monaco editor with syntax highlighting
-- **Time Series Support** — time columns are detected from Kinetica table metadata and
-  converted automatically, so `datetime`/`timestamp`/`date` columns render as time series
+- **Time Series Support** — time columns are detected from the column types Kinetica
+  returns with each result, whatever their alias, so `datetime`/`timestamp`/`date` columns
+  render as time series; **Format as: Time series** turns one query into one series per
+  value of its text columns
+- **Label filters on text-searchable JSON** — `$__labelMatch` and `$__labelRegex` filter a
+  `JSON(text_search)` column of labels by a dashboard variable, multi-value included
 - **Table Visualizations** — display query results in Grafana tables
 - **Grafana Alerting** — create alerts from Kinetica query results
 - **Secure Credentials** — passwords are stored in Grafana's encrypted secret storage and
@@ -113,11 +117,32 @@ dropdowns.
 
 1. Select a time column in the **Time Column** dropdown.
 2. Use `$__timeFilter()` in your query so Grafana's time range picker filters the data.
+3. To draw one series per value of a text column (one per host, say), set **Format as** to
+   **Time series**.
 
-Time handling is metadata-driven: the backend inspects the table schema to learn which
-columns are `datetime`, `timestamp`, or `date`. Aggregates are handled carefully — only
-time-preserving aggregates (`MIN`, `MAX`, `FIRST`, `LAST`, or none) keep a column typed as
-time, while `COUNT`/`SUM`/`AVG` of a date column produce a number.
+Time handling follows the result's column types: Kinetica returns each column's type
+with the result, and every `timestamp`, `datetime` or `date` column becomes a time field,
+under any alias and from any subquery, including `TIME_BUCKET(...)` and `$__timeGroup(...)`
+results. `COUNT`/`SUM`/`AVG` of a date column is a number, and stays one. Older servers
+that return no column types fall back to the table's metadata: the builder's table, or
+the first table after `FROM`. `DECIMAL` columns are returned as numbers.
+
+**Format as** (next to **Raw SQL Mode**):
+
+- **Table** (the default) returns the result as the query does.
+- **Time series** expects a time column, text columns and number columns, a row per time
+  and combination of the text columns, as a `GROUP BY` on a time bucket and those columns
+  returns. It makes one series per combination, labelled with it, so a time series panel
+  needs no transformation:
+
+  ```sql
+  SELECT $__timeGroup(ts, $__interval) AS time, host, AVG(cpu) AS cpu
+  FROM prod.host_metrics
+  WHERE $__timeFilter(ts)
+  GROUP BY $__timeGroup(ts, $__interval), host
+  ```
+
+  A result without a time column, text columns or number columns is returned as it is.
 
 ### Macros
 
@@ -125,12 +150,43 @@ These macros are expanded by the plugin backend before the query reaches Kinetic
 
 | Macro | Description |
 |-------|-------------|
-| `$__timeFilter(column)` | Time range filter from Grafana's time picker. Type-aware: emits quoted timestamp literals for string/date columns, epoch milliseconds otherwise. |
-| `$__timeFrom()` | Start of the selected time range |
-| `$__timeTo()` | End of the selected time range |
+| `$__timeFilter(column)` | Time range filter from Grafana's time picker. Type-aware: emits quoted UTC timestamp literals for string/date columns, epoch milliseconds otherwise. The column's type is read from the builder's table or, in raw SQL, from the first table after `FROM`. |
+| `$__timeFrom()` | Start of the selected time range, as a quoted UTC timestamp literal |
+| `$__timeTo()` | End of the selected time range, as a quoted UTC timestamp literal |
 | `$__unixEpochFrom()` | Start of the selected time range, as a Unix epoch value |
 | `$__unixEpochTo()` | End of the selected time range, as a Unix epoch value |
 | `$__timeGroup(column, interval)` | Rounds a time column down to interval boundaries, for `GROUP BY`. Accepts `30s`, `5m`, `1h`, `7d`, `500ms`, quoted or bare, and `$__interval`. Expands to Kinetica's `TIME_BUCKET`, and the aliased result is typed as a time field so Grafana draws a time series. |
+| `$__labelMatch(column, 'key', values)` | The label `key` of a `JSON(text_search)` column equals one of `values`. Expands to one `text_match` call. See [Label filters](#label-filters). |
+| `$__labelRegex(column, 'key', patterns)` | The label `key` matches one of the regular expressions `patterns`, each against the whole value. See [Label filters](#label-filters). |
+
+#### Label filters
+
+`$__labelMatch` and `$__labelRegex` filter on a label held in a `JSON(text_search)` column,
+such as the `labels` column of the `metric_series` table the Kinetica OpenTelemetry
+exporter writes. Pass a dashboard variable with Grafana's `json` format, so a multi-value
+variable arrives whole and every value is escaped correctly:
+
+```sql
+SELECT ...
+FROM otel.metric_series s
+WHERE $__labelMatch(s.labels, 'service.name', ${service:json})
+  AND $__labelRegex(s.labels, 'http.route', ${route_pattern:json})
+```
+
+With `service` set to `checkout` and `cart`, the first line expands to
+`text_match(s.labels, 'labels.service.name:"checkout" OR labels.service.name:"cart"')`.
+
+- `values` and `patterns` are a JSON string or array of strings; numbers are matched as
+  text. Empty values are ignored.
+- **No filter:** an empty array, values that are all empty, or a bare `*` expand to
+  `1 = 1`. Set a multi-value variable's **Custom all value** to `*` so that *All* means no
+  filter, including rows without the label; without it, *All* matches every listed value.
+- A value matches exactly — and case-sensitively when the column's text index uses the
+  `keyword` analyzer. Quotes, backslashes and apostrophes in values are escaped for you.
+- A pattern matches the whole label value, as a PromQL `=~` matcher does. Several patterns
+  become one alternation. Keys a regex can match use only letters, digits, `_` and `.`.
+- The column may be qualified (`s.labels`); the text search addresses the label through
+  the column's own name (`labels.service.name`).
 
 ### Template variables
 
@@ -181,12 +237,6 @@ SELECT DISTINCT host FROM prod.sensors ORDER BY host
 
 ## Known limitations
 
-- **In raw SQL mode, result columns come back in alphabetical order**, not in the order
-  you wrote them in `SELECT`. The backend sorts column names before building the frame
-  (`sort.Strings` in `parseToFrame`), and the frontend restores your order only when the
-  query carries query-builder metadata. Raw SQL has no such metadata, so nothing puts it
-  back. Aliasing columns so their names sort the way you want is the only workaround;
-  the query builder is unaffected.
 - **`OFFSET` has no query-builder control.** It exists in the query model and SQL
   generator, so it can be set in a provisioned or hand-edited query JSON, but there is no
   field for it in the editor UI.

@@ -107,72 +107,7 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 
 	logDebug("Macro replacement complete", "refId", query.RefID, "final_sql", sql)
 
-	// 3. Determine Table Name for Metadata Lookup
-	fullTableName := qModel.Builder.Table
-
-	// A. Try Builder
-	if qModel.Builder.Schema != "" && !strings.HasPrefix(qModel.Builder.Table, qModel.Builder.Schema+".") {
-		fullTableName = fmt.Sprintf("%s.%s", qModel.Builder.Schema, qModel.Builder.Table)
-	}
-
-	// B. Fallback: Raw SQL
-	if fullTableName == "" || fullTableName == "." {
-		// Regex to find "FROM <table_name>"
-		// Matches: FROM table, FROM schema.table, FROM "schema"."table"
-		re := regexp.MustCompile(`(?i)\bFROM\s+([a-zA-Z0-9_."]+)`)
-		match := re.FindStringSubmatch(sql)
-		if len(match) > 1 {
-			fullTableName = match[1]
-			// Clean up quotes if present (e.g., "schema"."table" -> schema.table)
-			fullTableName = strings.ReplaceAll(fullTableName, "\"", "")
-		}
-		logDebug("Table name extracted from Raw SQL", "table", fullTableName)
-	}
-
-	// 4. Identify Time Columns (Base Table)
-	timeCols, err := d.getTimeColumns(ctx, db, fullTableName)
-	if err != nil {
-		logWarn("Could not fetch table metadata", "table", fullTableName, "err", err)
-		timeCols = make(map[string]bool)
-	}
-
-	// 5. Handle Aliases & Aggregates
-	// We map aliases in the `timeCols` map so `parseToFrame` knows how to handle them.
-	if len(qModel.Builder.Selects) > 0 {
-		for _, sel := range qModel.Builder.Selects {
-			if sel.Alias != "" && sel.Column != "" {
-				// A. Clean Quotes sent by frontend
-				cleanCol := strings.Trim(sel.Column, "\"")
-				cleanAlias := strings.Trim(sel.Alias, "\"")
-
-				// B. Check if original column is a Time column
-				if isTime, ok := timeCols[cleanCol]; ok && isTime {
-
-					// C. AGGREGATE SAFETY CHECK
-					// Only preserve "Time" type if the function preserves time (MIN, MAX, or None).
-					// COUNT, SUM, AVG of a date returns a Number, not a Date.
-					agg := strings.ToUpper(sel.Aggregate)
-					isTimePreserving := agg == "" || agg == "MIN" || agg == "MAX" || agg == "FIRST" || agg == "LAST"
-
-					if isTimePreserving {
-						timeCols[cleanAlias] = true
-					}
-				}
-			}
-		}
-	}
-
-	// 5b. Aliases produced by $__timeGroup
-	// The macro emits a TIMESTAMP() expression, but parseToFrame types columns by
-	// looking their name up in the base table's metadata -- and an alias like
-	// "time" is not a column of that table, so the bucket would arrive as a plain
-	// number and Grafana would not draw a time series. The alias is read from the
-	// pre-expansion SQL, where the macro is still recognisable.
-	for _, alias := range timeGroupAliases(qModel.RawSql) {
-		timeCols[alias] = true
-	}
-
-	// 6. Execute SQL
+	// 3. Execute SQL
 	logDebug("Sending query to Kinetica", "refId", query.RefID)
 	options := &kinetica.ExecuteSqlOptions{Encoding: "binary"}
 	rawResp, err := db.ExecuteSqlRawWithOpts(ctx, sql, 0, -9999, "", nil, options)
@@ -181,14 +116,14 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 		return backend.ErrDataResponse(backend.StatusBadGateway, "Query failed, see Grafana server log for details")
 	}
 
-	// 7. Parse Avro Schema
+	// 4. Parse Avro Schema
 	schema, err := avro.Parse(rawResp.ResponseSchema)
 	if err != nil {
 		logError("Avro schema parse failed", "refId", query.RefID, "err", err)
 		return backend.ErrDataResponse(backend.StatusInternal, "Query failed, see Grafana server log for details")
 	}
 
-	// 8. Unmarshal Data
+	// 5. Unmarshal Data
 	rawMap := make(map[string]any)
 	err = avro.Unmarshal(schema, rawResp.BinaryEncodedResponse, &rawMap)
 	if err != nil {
@@ -196,31 +131,102 @@ func (d *Datasource) query(ctx context.Context, db *kinetica.Kinetica, query bac
 		return backend.ErrDataResponse(backend.StatusInternal, "Query failed, see Grafana server log for details")
 	}
 
-	// 9. Extract Headers & Clean Data
-	headersVar, ok := rawMap["column_headers"]
+	// 6. Columns, in the order the query selects them, with their Kinetica types
+	columns, ok := resultColumns(rawMap)
 	if !ok {
 		return backend.DataResponse{Frames: data.Frames{data.NewFrame("response")}}
 	}
-	headersInterface := headersVar.([]any)
 
-	cleanData := make(map[string]any, len(headersInterface))
-	for i, h := range headersInterface {
-		headerName := fmt.Sprintf("%v", h)
-		internalKey := fmt.Sprintf("column_%d", i+1)
-
-		if colData, exists := rawMap[internalKey]; exists {
-			cleanData[headerName] = colData
-		}
+	// 7. Time columns. The response names each column's type, which identifies
+	// the time columns whatever their alias or the query's shape; the queried
+	// table's metadata is only read when the server sends no types.
+	timeCols := make(map[string]bool)
+	if !hasDatatypes(columns) {
+		timeCols = d.metadataTimeColumns(ctx, db, qModel, sql)
+	}
+	// Aliases produced by $__timeGroup, read from the pre-expansion SQL, where the
+	// macro is still recognisable
+	for _, alias := range timeGroupAliases(qModel.RawSql) {
+		timeCols[alias] = true
 	}
 
-	// 10. Convert to Frame
-	frame, err := parseToFrame(&cleanData, timeCols, query.RefID)
+	// 8. Convert to Frame
+	frame, err := parseToFrame(columns, timeCols, query.RefID)
 	if err != nil {
 		return backend.ErrDataResponse(backend.StatusInternal, err.Error())
 	}
 
+	// 9. Time series format: one series per combination of the string columns
+	if qModel.Format == formatTimeSeries {
+		frame, err = toTimeSeriesFrame(frame)
+		if err != nil {
+			logError("Time series conversion failed", "refId", query.RefID, "err", err)
+			return backend.ErrDataResponse(backend.StatusBadRequest, "Query failed, see Grafana server log for details")
+		}
+	}
+
 	return backend.DataResponse{Frames: data.Frames{frame}}
 }
+
+// metadataTimeColumns - the time columns of a query read from the metadata of
+// the table it queries: the builder's table, or else the first table named
+// after a FROM; for servers whose responses carry no column types
+//
+//	@return map[string]bool - the names of the time columns, with the builder's
+//	aliases of them
+func (d *Datasource) metadataTimeColumns(ctx context.Context, db *kinetica.Kinetica, qModel QueryModel, sql string) map[string]bool {
+	// A. Try Builder
+	fullTableName := qModel.Builder.Table
+	if qModel.Builder.Schema != "" && !strings.HasPrefix(qModel.Builder.Table, qModel.Builder.Schema+".") {
+		fullTableName = fmt.Sprintf("%s.%s", qModel.Builder.Schema, qModel.Builder.Table)
+	}
+
+	// B. Fallback: Raw SQL
+	if fullTableName == "" || fullTableName == "." {
+		fullTableName = fromTableName(sql)
+		logDebug("Table name extracted from Raw SQL", "table", fullTableName)
+	}
+
+	timeCols, err := d.getTimeColumns(ctx, db, fullTableName)
+	if err != nil {
+		logWarn("Could not fetch table metadata", "table", fullTableName, "err", err)
+	}
+	if timeCols == nil {
+		timeCols = make(map[string]bool)
+	}
+
+	// Map the builder's aliases of time columns, so parseToFrame knows them
+	for _, sel := range qModel.Builder.Selects {
+		if sel.Alias == "" || sel.Column == "" {
+			continue
+		}
+		// Clean quotes sent by the frontend
+		cleanCol := strings.Trim(sel.Column, "\"")
+		cleanAlias := strings.Trim(sel.Alias, "\"")
+		if !timeCols[cleanCol] {
+			continue
+		}
+		// Only preserve the time type if the function preserves time (MIN, MAX,
+		// or none): COUNT, SUM, AVG of a date returns a number, not a date
+		agg := strings.ToUpper(sel.Aggregate)
+		if agg == "" || agg == "MIN" || agg == "MAX" || agg == "FIRST" || agg == "LAST" {
+			timeCols[cleanAlias] = true
+		}
+	}
+	return timeCols
+}
+
+// fromTableName - the first table named after a FROM in a query, without
+// quotes: FROM table, FROM schema.table or FROM "schema"."table"; "" if none
+func fromTableName(sql string) string {
+	match := fromTablePattern.FindStringSubmatch(sql)
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.ReplaceAll(match[1], "\"", "")
+}
+
+var fromTablePattern = regexp.MustCompile(`(?i)\bFROM\s+([a-zA-Z0-9_."]+)`)
 
 // -------------------------------------------------------------------------
 // 2. METADATA & MACRO HELPERS
@@ -349,16 +355,22 @@ func prepareSql(ctx context.Context, q backend.DataQuery, db *kinetica.Kinetica)
 		}
 		colName := submatches[1]
 
-		isString, err := getColumnIsString(ctx, db, qModel.Builder.Schema, qModel.Builder.Table, colName)
+		// The column's table: the builder's, or for raw SQL the first table
+		// named after a FROM
+		schema, table := qModel.Builder.Schema, qModel.Builder.Table
+		if table == "" {
+			schema, table = "", fromTableName(qModel.RawSql)
+		}
+		isString, err := getColumnIsString(ctx, db, schema, table, colName)
 		if err != nil {
 			logError("Failed to lookup column type", "err", err)
 			isString = false
 		}
 
 		if isString {
-			fromStr := q.TimeRange.From.Format("2006-01-02 15:04:05.000")
-			toStr := q.TimeRange.To.Format("2006-01-02 15:04:05.000")
-			return fmt.Sprintf("%s >= '%s' AND %s <= '%s'", colName, fromStr, colName, toStr)
+			fromStr := kineticaTimeLiteral(q.TimeRange.From)
+			toStr := kineticaTimeLiteral(q.TimeRange.To)
+			return fmt.Sprintf("%s >= %s AND %s <= %s", colName, fromStr, colName, toStr)
 		} else {
 			return fmt.Sprintf("%s >= %d AND %s <= %d", colName, q.TimeRange.From.UnixMilli(), colName, q.TimeRange.To.UnixMilli())
 		}
@@ -367,13 +379,13 @@ func prepareSql(ctx context.Context, q backend.DataQuery, db *kinetica.Kinetica)
 	// 2. $__timeFrom()
 	reTimeFrom := regexp.MustCompile(`\$__timeFrom\(\)`)
 	sql = reTimeFrom.ReplaceAllStringFunc(sql, func(match string) string {
-		return fmt.Sprintf("'%s'", q.TimeRange.From.Format("2006-01-02 15:04:05.000"))
+		return kineticaTimeLiteral(q.TimeRange.From)
 	})
 
 	// 3. $__timeTo()
 	reTimeTo := regexp.MustCompile(`\$__timeTo\(\)`)
 	sql = reTimeTo.ReplaceAllStringFunc(sql, func(match string) string {
-		return fmt.Sprintf("'%s'", q.TimeRange.To.Format("2006-01-02 15:04:05.000"))
+		return kineticaTimeLiteral(q.TimeRange.To)
 	})
 
 	// 4. $__unixEpochFrom()
@@ -413,11 +425,31 @@ func prepareSql(ctx context.Context, q backend.DataQuery, db *kinetica.Kinetica)
 		return "", timeGroupErr
 	}
 
+	// 7. $__labelMatch(column, 'key', values) and $__labelRegex(column, 'key', patterns)
+	sql, err := expandLabelMacros(sql)
+	if err != nil {
+		return "", err
+	}
+
 	return sql, nil
+}
+
+// kineticaTimeLayout - how a time is written in a Kinetica timestamp literal
+const kineticaTimeLayout = "2006-01-02 15:04:05.000"
+
+// kineticaTimeLiteral - a SQL literal of a time, in UTC. Kinetica reads a
+// timestamp literal, which carries no zone, as UTC, while the SDK builds a
+// query's time range in the plugin process's local zone.
+func kineticaTimeLiteral(t time.Time) string {
+	return "'" + t.UTC().Format(kineticaTimeLayout) + "'"
 }
 
 func getColumnIsString(ctx context.Context, db *kinetica.Kinetica, schema, table, colName string) (bool, error) {
 	cleanColName := strings.Trim(colName, "\"")
+	// A column qualified by a table alias (p.ts) is looked up by its own name
+	if i := strings.LastIndex(cleanColName, "."); i >= 0 {
+		cleanColName = strings.Trim(cleanColName[i+1:], "\"")
+	}
 
 	if table == "" {
 		return false, nil
@@ -618,26 +650,101 @@ func parseKineticaTimes(sliceData []any) ([]*time.Time, bool) {
 	return vector, true
 }
 
-func parseToFrame(results *map[string]any, timeCols map[string]bool, refID string) (*data.Frame, error) {
-	frame := data.NewFrame("response")
-	frame.RefID = refID
+// resultColumn - a column of a query's result
+type resultColumn struct {
+	name string
+	// datatype is Kinetica's name of the column's type, lower case, such as
+	// timestamp, datetime or decimal(28,6); "" when the response names none
+	datatype string
+	values   []any
+}
 
-	if results == nil || len(*results) == 0 {
-		return frame, nil
+// resultColumns - the columns of a decoded /execute/sql response, in the order
+// the query selects them, with the types the response gives them
+//
+//	@return bool - false when the response has no column headers
+func resultColumns(rawMap map[string]any) ([]resultColumn, bool) {
+	headersVar, ok := rawMap["column_headers"]
+	if !ok {
+		return nil, false
 	}
+	headers, _ := headersVar.([]any)
+	datatypes, _ := rawMap["column_datatypes"].([]any)
 
-	var colNames []string
-	for k := range *results {
-		colNames = append(colNames, k)
-	}
-	sort.Strings(colNames)
-
-	for _, colName := range colNames {
-		rawColData := (*results)[colName]
-		sliceData, ok := rawColData.([]any)
+	columns := make([]resultColumn, 0, len(headers))
+	for i, h := range headers {
+		values, ok := rawMap[fmt.Sprintf("column_%d", i+1)].([]any)
 		if !ok {
 			continue
 		}
+		column := resultColumn{name: fmt.Sprintf("%v", h), values: values}
+		if i < len(datatypes) {
+			column.datatype = strings.ToLower(fmt.Sprintf("%v", datatypes[i]))
+		}
+		columns = append(columns, column)
+	}
+	return columns, true
+}
+
+// hasDatatypes - whether the response named the type of every column; older
+// servers send no column_datatypes
+func hasDatatypes(columns []resultColumn) bool {
+	for _, c := range columns {
+		if c.datatype == "" {
+			return false
+		}
+	}
+	return len(columns) > 0
+}
+
+// isTimeDatatype - whether a Kinetica type is a point in time: timestamp
+// (milliseconds since the epoch), datetime or date (text)
+func isTimeDatatype(datatype string) bool {
+	switch datatype {
+	case "timestamp", "datetime", "date":
+		return true
+	}
+	return false
+}
+
+// isDecimalDatatype - whether a Kinetica type is a decimal, which the
+// response carries as text
+func isDecimalDatatype(datatype string) bool {
+	return strings.HasPrefix(datatype, "decimal")
+}
+
+// parseDecimals - a column of decimal text as numbers
+//
+//	@return bool - false unless every non-null value parses
+func parseDecimals(sliceData []any) ([]*float64, bool) {
+	vector := make([]*float64, len(sliceData))
+	for i, v := range sliceData {
+		if v == nil {
+			continue
+		}
+		str, ok := v.(string)
+		if !ok {
+			return nil, false
+		}
+		f, err := strconv.ParseFloat(strings.TrimSpace(str), 64)
+		if err != nil {
+			return nil, false
+		}
+		vector[i] = &f
+	}
+	return vector, true
+}
+
+// parseToFrame - the frame of a query's result, its fields in the order the
+// query selects its columns. A column is a time field when its type is a time
+// type, or its name is in timeCols.
+func parseToFrame(columns []resultColumn, timeCols map[string]bool, refID string) (*data.Frame, error) {
+	frame := data.NewFrame("response")
+	frame.RefID = refID
+
+	for _, column := range columns {
+		colName := column.name
+		sliceData := column.values
 
 		rowCount := len(sliceData)
 		if rowCount == 0 {
@@ -645,7 +752,7 @@ func parseToFrame(results *map[string]any, timeCols map[string]bool, refID strin
 			continue
 		}
 
-		isTimeColumn := timeCols[colName]
+		isTimeColumn := timeCols[colName] || isTimeDatatype(column.datatype)
 		var sampleVal any
 		for _, v := range sliceData {
 			if v != nil {
@@ -722,6 +829,13 @@ func parseToFrame(results *map[string]any, timeCols map[string]bool, refID strin
 				}
 				logWarn("Time column did not parse as a timestamp; leaving it as text", "column", colName)
 			}
+			if isDecimalDatatype(column.datatype) {
+				if numbers, ok := parseDecimals(sliceData); ok {
+					frame.Fields = append(frame.Fields, data.NewField(colName, nil, numbers))
+					continue
+				}
+				logWarn("Decimal column did not parse as numbers; leaving it as text", "column", colName)
+			}
 			vector := make([]*string, rowCount)
 			for i, v := range sliceData {
 				if v != nil {
@@ -788,4 +902,46 @@ func addCallerContext(level string, msg string, args ...any) {
 	case "debug":
 		log.DefaultLogger.Debug(msg, finalArgs...)
 	}
+}
+
+// toTimeSeriesFrame - a long frame (one row per time and combination of its
+// string columns) as a wide one, with a value field per combination, labelled
+// by it; any other frame as it is. Rows are sorted by time first, as the
+// conversion requires, and rows without a time are left out.
+func toTimeSeriesFrame(frame *data.Frame) (*data.Frame, error) {
+	schema := frame.TimeSeriesSchema()
+	if schema.Type != data.TimeSeriesTypeLong {
+		return frame, nil
+	}
+	rowCount, err := frame.RowLen()
+	if err != nil {
+		return nil, err
+	}
+
+	timeField := frame.Fields[schema.TimeIndex]
+	timeAt := func(row int) (time.Time, bool) {
+		v, ok := timeField.ConcreteAt(row)
+		if !ok {
+			return time.Time{}, false
+		}
+		t, ok := v.(time.Time)
+		return t, ok
+	}
+	rows := make([]int, 0, rowCount)
+	for row := 0; row < rowCount; row++ {
+		if _, ok := timeAt(row); ok {
+			rows = append(rows, row)
+		}
+	}
+	sort.SliceStable(rows, func(a, b int) bool {
+		ta, _ := timeAt(rows[a])
+		tb, _ := timeAt(rows[b])
+		return ta.Before(tb)
+	})
+
+	sorted := frame.EmptyCopy()
+	for _, row := range rows {
+		sorted.AppendRow(frame.RowCopy(row)...)
+	}
+	return data.LongToWide(sorted, &data.FillMissing{Mode: data.FillModeNull})
 }

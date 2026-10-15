@@ -1,9 +1,18 @@
 import { DataSourceJsonData } from '@grafana/data';
 import { DataQuery } from '@grafana/schema';
 
+/**
+ * How a query's result is shaped. `table` returns it as the query does;
+ * `time_series` turns a result with a time column, string columns and number
+ * columns into one series per combination of the string columns' values.
+ */
+export type KineticaFormat = 'table' | 'time_series';
+
 export interface KineticaQuery extends DataQuery {
   rawSql: string;
   builder?: KineticaQueryBuilder; 
+  /** Defaults to `table`, which is how queries saved before it existed behave. */
+  format?: KineticaFormat;
 }
 
 export const defaultQuery: Partial<KineticaQuery> = {

@@ -243,13 +243,19 @@ without parentheses is left in the query untouched.
 
 | Macro | Description |
 |-------|-------------|
-| `$__timeFrom()` | Start of selected time range, as a quoted timestamp literal |
-| `$__timeTo()` | End of selected time range, as a quoted timestamp literal |
+| `$__timeFrom()` | Start of selected time range, as a quoted UTC timestamp literal |
+| `$__timeTo()` | End of selected time range, as a quoted UTC timestamp literal |
 | `$__unixEpochFrom()` | Start of selected time range, as epoch milliseconds |
 | `$__unixEpochTo()` | End of selected time range, as epoch milliseconds |
 | `$__timeFilter(column)` | Generates a time filter for the specified column |
 | `$__timeGroup(column, interval)` | Rounds a time column down to interval boundaries |
+| `$__labelMatch(column, 'key', values)` | The label `key` of a `JSON(text_search)` column equals one of `values`, a JSON string or array such as `${var:json}`; `*` or `[]` means no filter |
+| `$__labelRegex(column, 'key', patterns)` | The label `key` matches one of the regular expressions `patterns`, each against the whole value |
 | `$__interval` | Suggested interval based on panel width (resolved by Grafana, not the backend) |
+
+Timestamp literals are written in UTC, which is how Kinetica reads them, whatever the
+time zone of the Grafana server. See the README's *Label filters* section for the label
+macros.
 
 ### 5.2 Query Editor Features
 
@@ -268,24 +274,25 @@ Use the **Format** button to automatically format your SQL for readability. The 
 
 ### 5.3 Time Series Data
 
-For time series panels, ensure your query returns data in the expected format:
+A column is a time field when Kinetica returns it as a `timestamp`, `datetime` or `date`,
+whatever its alias: a table's time column, `TIME_BUCKET(...)` or `$__timeGroup(...)`.
+Columns come back in the order the query selects them, and `DECIMAL` columns as numbers.
 
-- First column: timestamp (as epoch or ISO 8601)
-- Second column: numeric value
-- Additional columns: labels/dimensions (optional)
-
-Example time series query:
+For one series per value of a text column, set **Format as** to **Time series** in the
+query editor and return a time column, the text columns and the number columns:
 
 ```sql
 SELECT
-  timestamp AS time,
-  avg(temperature) AS value,
-  location AS metric
+  $__timeGroup(timestamp, $__interval) AS time,
+  location,
+  AVG(temperature) AS temperature
 FROM weather_stations
 WHERE $__timeFilter(timestamp)
 GROUP BY $__timeGroup(timestamp, $__interval), location
-ORDER BY time ASC
 ```
+
+Each location becomes a series labelled `location=<value>`. With **Format as: Table**,
+the default, the same query returns one row per time and location.
 
 ### 5.4 Template Variables
 

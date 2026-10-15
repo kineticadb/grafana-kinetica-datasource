@@ -125,6 +125,11 @@ describe('DataSource.applyTemplateVariables', () => {
     expect(() => ds.applyTemplateVariables(query, {})).not.toThrow();
     expect(replaceMock).toHaveBeenCalledWith('', {}, interpolateSqlVariable);
   });
+
+  it('keeps the format the backend shapes the result by', () => {
+    const query: KineticaQuery = { refId: 'A', rawSql: 'SELECT 1', format: 'time_series' };
+    expect(ds.applyTemplateVariables(query, {}).format).toBe('time_series');
+  });
 });
 
 // Minimal stand-in for a backend frame; only `fields` matters to the conversion.
@@ -146,8 +151,8 @@ describe('frameToMetricFindValues', () => {
   });
 
   it('maps __text to the label and __value to the stored value', () => {
-    // Deliberately out of order: the backend sorts columns alphabetically, so the
-    // pair must be found by name rather than by position.
+    // Deliberately out of order: a query may select the pair either way round, so
+    // it must be found by name rather than by position.
     const frame = frameWith([
       { name: '__value', values: [10, 20] },
       { name: '__text', values: ['Ten', 'Twenty'] },

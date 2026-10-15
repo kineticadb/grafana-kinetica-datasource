@@ -74,8 +74,9 @@ function metricFindText(value: unknown): string {
  * required for the pair to apply, because a lone `__text` would silently discard
  * the value the user meant the variable to hold.
  *
- * Note the backend sorts columns alphabetically in `parseToFrame`, so these are
- * looked up by name rather than by position.
+ * `__text` and `__value` are looked up by name, wherever the query selects them;
+ * the backend keeps the query's column order, so "the first column" is the first
+ * one selected.
  */
 export function frameToMetricFindValues(frame?: DataFrame): MetricFindValue[] {
   const fields = frame?.fields;

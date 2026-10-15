@@ -7,6 +7,7 @@ import {
   Button,
   IconButton,
   Switch,
+  RadioButtonGroup,
   Alert,
   Stack,
   CodeEditor,
@@ -17,6 +18,7 @@ import { css } from '@emotion/css';
 import { DataSource, resolveIdentifier, variableIdentifierOptions } from '../datasource';
 import {
   KineticaQuery,
+  KineticaFormat,
   KineticaDataSourceOptions,
   KineticaQueryBuilder,
   KineticaJoin,
@@ -648,6 +650,15 @@ const BuilderForm: React.FC<BuilderFormProps> = ({ datasource, builder, onChange
   );
 };
 
+const formatOptions: Array<{ label: string; value: KineticaFormat; description: string }> = [
+  { label: 'Table', value: 'table', description: 'The result as the query returns it' },
+  {
+    label: 'Time series',
+    value: 'time_series',
+    description: 'One series per combination of the string columns, from a time column and number columns',
+  },
+];
+
 export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) {
   const styles = useStyles2(getStyles);
 
@@ -692,6 +703,11 @@ export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) 
       setLastSyncedSql(safeRawSql);
   }
 
+  const onFormatChange = (format: KineticaFormat) => {
+      onChange({ ...query, format });
+      onRunQuery();
+  };
+
   const onRawSqlBlur = () => {
       // Flatten: Replace newlines with spaces to satisfy "stored as single line" requirement
       const flattened = tempRawSql.replace(/[\r\n]+/g, ' ');
@@ -706,6 +722,9 @@ export function QueryEditor({ query, onChange, onRunQuery, datasource }: Props) 
       <div className={styles.editorHeader}>
         {!isRawSql && <Button variant="secondary" size="sm" onClick={onReset}>Reset</Button>}
         <Field label="Raw SQL Mode" className={styles.fieldNoMargin}><Switch value={isRawSql} onChange={() => setIsRawSql(!isRawSql)} /></Field>
+        <Field label="Format as" className={styles.fieldNoMargin}>
+          <RadioButtonGroup options={formatOptions} value={query.format ?? 'table'} onChange={onFormatChange} size="sm" />
+        </Field>
       </div>
       {isRawSql ? (
         <div className={styles.rawSqlContainer}>

@@ -15,8 +15,16 @@ type KineticaSelect struct {
 	Alias     string `json:"alias"`
 }
 
+// Query result formats: a table as the query returns it, or time series
+const (
+	formatTable      = "table"
+	formatTimeSeries = "time_series"
+)
+
 type QueryModel struct {
-	RawSql  string `json:"rawSql"`
+	RawSql string `json:"rawSql"`
+	// Format is formatTable (the default, also when empty) or formatTimeSeries
+	Format  string `json:"format"`
 	Builder struct {
 		Schema  string           `json:"schema"`
 		Table   string           `json:"table"`

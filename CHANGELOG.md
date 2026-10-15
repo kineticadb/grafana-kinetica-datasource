@@ -11,6 +11,39 @@ Intermediate tags and GitHub releases used during development are not listed, so
 version numbers here are not contiguous.
 
 
+## [Unreleased]
+
+### Added
+- **Format as: Time series.** A query editor option that turns a result with a time
+  column, text columns and number columns into one series per combination of the text
+  columns, labelled with it, so a time series panel needs no transformation. *Table*, the
+  default, returns the result as before.
+- `$__labelMatch(column, 'key', values)` and `$__labelRegex(column, 'key', patterns)`
+  macros, which filter on a label of a `JSON(text_search)` column -- such as the labels of
+  the Kinetica OpenTelemetry exporter's metric series -- with one `text_match` call.
+  - Take the values as `${var:json}`, so a multi-value variable passes whole; quotes,
+    backslashes and apostrophes are escaped.
+  - An empty array or a bare `*` (a variable's custom *All* value) means no filter.
+- `DECIMAL` columns are returned as numbers rather than text.
+
+### Fixed
+- `$__timeFrom()`, `$__timeTo()` and the timestamp-literal form of `$__timeFilter` were
+  written in the Grafana server's local time zone while Kinetica reads them as UTC, so on a
+  server not running in UTC every time range was shifted by its offset. They are now UTC.
+- Raw SQL results keep the column order of the `SELECT`; they came back in alphabetical
+  order. A *Query* variable's single column is now the first one selected.
+- A time column is recognised from the type Kinetica returns for it, so time buckets and
+  timestamps under any alias, or from a subquery, plot as time. Only the first table after
+  `FROM` was inspected before. Servers that return no column types fall back to that.
+- `$__timeFilter` in raw SQL now reads the column's type from the first table after `FROM`
+  (as it did only for builder queries), so it filters a `DATE` column, which cannot be
+  compared with epoch milliseconds, and a text column holding times, which compared as
+  text and matched nothing. A column qualified by a table alias is looked up by its name.
+
+### Changed
+- One metadata request less per query: the table's metadata is read only for servers
+  that return no column types.
+
 ## [1.0.12] - 2026-08-29 - https://github.com/kineticadb/grafana-kinetica-datasource/releases/tag/v1.0.12
 
 ### Added
