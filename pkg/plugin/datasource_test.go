@@ -179,7 +179,7 @@ func TestConcurrentQueryPattern_RaceCondition(t *testing.T) {
 	numQueries := 100
 	queries := make([]backend.DataQuery, numQueries)
 	for i := 0; i < numQueries; i++ {
-		queries[i] = backend.DataQuery{RefID: string(rune('A' + i%26)) + string(rune('0'+i/26))}
+		queries[i] = backend.DataQuery{RefID: string(rune('A'+i%26)) + string(rune('0'+i/26))}
 	}
 
 	g, _ := errgroup.WithContext(context.Background())
