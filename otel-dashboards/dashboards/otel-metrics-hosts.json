@@ -1,0 +1,426 @@
+{
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "12.3.0"
+    },
+    {
+      "type": "datasource",
+      "id": "kinetica-grafana-datasource",
+      "name": "Kinetica",
+      "version": "1.1.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "description": "Host metrics of the collector's hostmetrics receiver, from the Kinetica exporter's metric tables.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Hosts\nCPU, memory, filesystem, network and disk metrics of the collector's `hostmetrics` receiver, per `host.name` (set by the `resourcedetection` processor). Needs the Kinetica datasource plugin 1.1.0 or later, and the series and point tables (`metric_series`, `metric_*_point`) the latest Kinetica OpenTelemetry exporter writes, in the schema chosen above. Rates assume cumulative temporality (the default of most SDKs; for delta, run the collector's `deltatocumulative` processor). Each series is averaged per time bucket, which follows the zoom level, 1m at least."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "CPU utilization",
+      "description": "Share of CPU time not idle, across all CPUs of each host (system.cpu.time).",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, SUM(CASE WHEN state <> 'idle' THEN series_rate ELSE 0 END) / SUM(series_rate) AS cpu_utilization\nFROM (\n    SELECT $__timeGroup(time_unix, $__interval) AS time, series_id, host, state,\n           AVG(sample_rate) AS series_rate\n    FROM (\n        SELECT p.series_id, p.time_unix,\n               COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n               JSON_VALUE(s.labels, '$[\"state\"]') AS state,\n               CAST(CASE WHEN LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix) IS NULL THEN NULL\n                     WHEN p.value >= LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     THEN p.value - LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     ELSE p.value END AS DOUBLE) * 1000\n               / (MSECS_SINCE_EPOCH(p.time_unix)\n                  - LAG(MSECS_SINCE_EPOCH(p.time_unix)) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)) AS sample_rate\n        FROM $schema.metric_number_point p\n        JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.cpu.time'\n                 AND temporality = 2\n                 AND $__labelMatch(labels, 'host.name', ${host:json})) s\n          ON s.series_id = p.series_id\n        WHERE $__timeFilter(p.time_unix)\n    ) d\n    WHERE sample_rate IS NOT NULL\n    GROUP BY $__timeGroup(time_unix, $__interval), series_id, host, state\n) b\nGROUP BY time, host\nHAVING SUM(series_rate) > 0\nORDER BY time, host"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Load average (1m)",
+      "description": "system.cpu.load_average.1m per host.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, AVG(series_value) AS load_average\nFROM (\n    SELECT $__timeGroup(p.time_unix, $__interval) AS time,\n           p.series_id,\n           COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n           AVG(p.value) AS series_value\n    FROM $schema.metric_number_point p\n    JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.cpu.load_average.1m'\n                 AND $__labelMatch(labels, 'host.name', ${host:json})) s\n      ON s.series_id = p.series_id\n    WHERE $__timeFilter(p.time_unix)\n    GROUP BY $__timeGroup(p.time_unix, $__interval), p.series_id, COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown')\n) b\nGROUP BY time, host\nORDER BY time, host"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Memory used",
+      "description": "system.memory.usage in the used state, found with text_match on the series' labels.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, SUM(series_value) AS used_bytes\nFROM (\n    SELECT $__timeGroup(p.time_unix, $__interval) AS time,\n           p.series_id,\n           COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n           AVG(p.value) AS series_value\n    FROM $schema.metric_number_point p\n    JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.memory.usage'\n                 AND $__labelMatch(labels, 'host.name', ${host:json})\n                 AND text_match(labels, 'labels.state:\"used\"')) s\n      ON s.series_id = p.series_id\n    WHERE $__timeFilter(p.time_unix)\n    GROUP BY $__timeGroup(p.time_unix, $__interval), p.series_id, COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown')\n) b\nGROUP BY time, host\nORDER BY time, host"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Filesystem utilization",
+      "description": "Used share of each filesystem (system.filesystem.usage), per host and mountpoint.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, mountpoint,\n       SUM(CASE WHEN state = 'used' THEN series_value ELSE 0 END) / SUM(series_value) AS utilization\nFROM (\n    SELECT $__timeGroup(p.time_unix, $__interval) AS time,\n           p.series_id,\n           COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n           JSON_VALUE(s.labels, '$[\"mountpoint\"]') AS mountpoint,\n           JSON_VALUE(s.labels, '$[\"state\"]') AS state,\n           AVG(p.value) AS series_value\n    FROM $schema.metric_number_point p\n    JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.filesystem.usage'\n                 AND $__labelMatch(labels, 'host.name', ${host:json})) s\n      ON s.series_id = p.series_id\n    WHERE $__timeFilter(p.time_unix)\n    GROUP BY $__timeGroup(p.time_unix, $__interval), p.series_id, COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown'),\n             JSON_VALUE(s.labels, '$[\"mountpoint\"]'), JSON_VALUE(s.labels, '$[\"state\"]')\n) b\nGROUP BY time, host, mountpoint\nHAVING SUM(series_value) > 0\nORDER BY time, host, mountpoint"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Network throughput",
+      "description": "Bytes per second per host and direction (system.network.io).",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, direction, SUM(series_rate) AS bytes_per_second\nFROM (\n    SELECT $__timeGroup(time_unix, $__interval) AS time, series_id, host, direction,\n           AVG(sample_rate) AS series_rate\n    FROM (\n        SELECT p.series_id, p.time_unix,\n               COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n               JSON_VALUE(s.labels, '$[\"direction\"]') AS direction,\n               CAST(CASE WHEN LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix) IS NULL THEN NULL\n                     WHEN p.value >= LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     THEN p.value - LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     ELSE p.value END AS DOUBLE) * 1000\n               / (MSECS_SINCE_EPOCH(p.time_unix)\n                  - LAG(MSECS_SINCE_EPOCH(p.time_unix)) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)) AS sample_rate\n        FROM $schema.metric_number_point p\n        JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.network.io'\n                 AND temporality = 2\n                 AND $__labelMatch(labels, 'host.name', ${host:json})) s\n          ON s.series_id = p.series_id\n        WHERE $__timeFilter(p.time_unix)\n    ) d\n    WHERE sample_rate IS NOT NULL\n    GROUP BY $__timeGroup(time_unix, $__interval), series_id, host, direction\n) b\nGROUP BY time, host, direction\nORDER BY time, host, direction"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Disk throughput",
+      "description": "Bytes per second per host and direction (system.disk.io).",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT time, host, direction, SUM(series_rate) AS bytes_per_second\nFROM (\n    SELECT $__timeGroup(time_unix, $__interval) AS time, series_id, host, direction,\n           AVG(sample_rate) AS series_rate\n    FROM (\n        SELECT p.series_id, p.time_unix,\n               COALESCE(NULLIF(JSON_VALUE(s.labels, '$[\"host.name\"]'), ''), 'unknown') AS host,\n               JSON_VALUE(s.labels, '$[\"direction\"]') AS direction,\n               CAST(CASE WHEN LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix) IS NULL THEN NULL\n                     WHEN p.value >= LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     THEN p.value - LAG(p.value) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)\n                     ELSE p.value END AS DOUBLE) * 1000\n               / (MSECS_SINCE_EPOCH(p.time_unix)\n                  - LAG(MSECS_SINCE_EPOCH(p.time_unix)) OVER (PARTITION BY p.series_id ORDER BY p.time_unix)) AS sample_rate\n        FROM $schema.metric_number_point p\n        JOIN (SELECT series_id, service_name, labels FROM $schema.metric_series\n               WHERE metric_name = 'system.disk.io'\n                 AND temporality = 2\n                 AND $__labelMatch(labels, 'host.name', ${host:json})) s\n          ON s.series_id = p.series_id\n        WHERE $__timeFilter(p.time_unix)\n    ) d\n    WHERE sample_rate IS NOT NULL\n    GROUP BY $__timeGroup(time_unix, $__interval), series_id, host, direction\n) b\nGROUP BY time, host, direction\nORDER BY time, host, direction"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "opentelemetry",
+    "kinetica",
+    "metrics"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Kinetica",
+        "multi": false,
+        "name": "DS_KINETICA",
+        "options": [],
+        "query": "kinetica-grafana-datasource",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "name": "schema",
+        "label": "Schema",
+        "type": "textbox",
+        "query": "otel",
+        "hide": 0,
+        "current": {
+          "text": "otel",
+          "value": "otel"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "otel",
+            "value": "otel"
+          }
+        ],
+        "description": "The schema the Kinetica exporter writes its metric tables to"
+      },
+      {
+        "name": "host",
+        "label": "Host",
+        "type": "query",
+        "description": "The hosts with host metrics",
+        "datasource": {
+          "type": "kinetica-grafana-datasource",
+          "uid": "${DS_KINETICA}"
+        },
+        "query": {
+          "refId": "host-values",
+          "rawSql": "SELECT DISTINCT JSON_VALUE(labels, '$[\"host.name\"]') AS value FROM $schema.metric_series WHERE metric_name LIKE 'system.%' AND JSON_VALUE(labels, '$[\"host.name\"]') <> '' ORDER BY value"
+        },
+        "definition": "SELECT DISTINCT JSON_VALUE(labels, '$[\"host.name\"]') AS value FROM $schema.metric_series WHERE metric_name LIKE 'system.%' AND JSON_VALUE(labels, '$[\"host.name\"]') <> '' ORDER BY value",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "refresh": 1,
+        "sort": 1,
+        "regex": "",
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "OTel metrics on Kinetica / Hosts",
+  "uid": "kinetica-otel-hosts",
+  "version": 1,
+  "weekStart": ""
+}

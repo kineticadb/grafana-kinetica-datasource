@@ -188,6 +188,10 @@ With `service` set to `checkout` and `cart`, the first line expands to
 - The column may be qualified (`s.labels`); the text search addresses the label through
   the column's own name (`labels.service.name`).
 
+Dashboards for the exporter's metrics, built on these macros, are in the
+[`otel-dashboards`](https://github.com/kineticadb/grafana-kinetica-datasource/tree/master/otel-dashboards)
+directory of this plugin's repository. They are not installed with the plugin.
+
 ### Template variables
 
 Dashboard and template variables are interpolated into the query before it is sent to

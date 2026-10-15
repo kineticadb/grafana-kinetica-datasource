@@ -386,6 +386,7 @@ Key directories in the project:
 | `pkg/` | Backend Go source code |
 | `dist/` | Compiled plugin distribution |
 | `provisioning/` | Grafana provisioning configuration |
+| `otel-dashboards/` | Dashboards for the metrics of the Kinetica OpenTelemetry exporter, with their tests; not part of the plugin package. They need the latest exporter and this plugin 1.1.0 or later: see `otel-dashboards/README.md` |
 | `tests/` | E2E Playwright tests |
 | `.config/` | Build tool configurations |
 

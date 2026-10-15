@@ -1,0 +1,339 @@
+{
+  "__requires": [
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "12.3.0"
+    },
+    {
+      "type": "datasource",
+      "id": "kinetica-grafana-datasource",
+      "name": "Kinetica",
+      "version": "1.1.0"
+    }
+  ],
+  "annotations": {
+    "list": []
+  },
+  "description": "What the Kinetica exporter has written to its metric tables: metrics, series, labels and ingest volume.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "### Inventory\nThe metrics, series and labels in the metric tables, and the points written. Needs the Kinetica datasource plugin 1.1.0 or later, and the series and point tables (`metric_series`, `metric_*_point`) the latest Kinetica OpenTelemetry exporter writes, in the schema chosen above. The service filter applies to everything but the points written, which the point tables do not record per service."
+      }
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Metrics",
+      "description": "Every metric, with its number of series and services.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 24,
+        "h": 10
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT metric_name, metric_type, unit,\n       COUNT(*) AS series,\n       COUNT(DISTINCT service_name) AS services,\n       MIN(first_seen) AS first_seen\nFROM $schema.metric_series\nWHERE $__labelMatch(labels, 'service.name', ${service:json})\nGROUP BY metric_name, metric_type, unit\nORDER BY series DESC, metric_name"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Series per service",
+      "description": "Series and metrics of each service (service.name).",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT COALESCE(service_name, '(none)') AS service,\n       COUNT(*) AS series,\n       COUNT(DISTINCT metric_name) AS metric_names\nFROM $schema.metric_series\nWHERE $__labelMatch(labels, 'service.name', ${service:json})\nGROUP BY COALESCE(service_name, '(none)')\nORDER BY series DESC"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Label keys",
+      "description": "Every label key, with the number of series having it: the cardinality to watch.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "table",
+          "rawSql": "SELECT label, COUNT(*) AS series\nFROM UNNEST_JSON_OBJECT(SELECT labels FROM $schema.metric_series WHERE $__labelMatch(labels, 'service.name', ${service:json})) t(label, label_value)\nGROUP BY label\nORDER BY series DESC, label"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Points written",
+      "description": "Rows written to each point table per time bucket, for every service.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroup(time_unix, $__interval) AS time, 'number' AS point_table, COUNT(*) AS points\nFROM $schema.metric_number_point\nWHERE $__timeFilter(time_unix)\nGROUP BY $__timeGroup(time_unix, $__interval)\nUNION ALL\nSELECT $__timeGroup(time_unix, $__interval) AS time, 'histogram' AS point_table, COUNT(*) AS points\nFROM $schema.metric_histogram_point\nWHERE $__timeFilter(time_unix)\nGROUP BY $__timeGroup(time_unix, $__interval)\nUNION ALL\nSELECT $__timeGroup(time_unix, $__interval) AS time, 'exp_histogram' AS point_table, COUNT(*) AS points\nFROM $schema.metric_exp_histogram_point\nWHERE $__timeFilter(time_unix)\nGROUP BY $__timeGroup(time_unix, $__interval)\nUNION ALL\nSELECT $__timeGroup(time_unix, $__interval) AS time, 'summary' AS point_table, COUNT(*) AS points\nFROM $schema.metric_summary_point\nWHERE $__timeFilter(time_unix)\nGROUP BY $__timeGroup(time_unix, $__interval)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "New series per hour",
+      "description": "Series seen for the first time, per metric type.",
+      "datasource": {
+        "type": "kinetica-grafana-datasource",
+        "uid": "${DS_KINETICA}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 22,
+        "w": 12,
+        "h": 8
+      },
+      "interval": "1m",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "showPoints": "never",
+            "spanNulls": true,
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            }
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "kinetica-grafana-datasource",
+            "uid": "${DS_KINETICA}"
+          },
+          "refId": "A",
+          "format": "time_series",
+          "rawSql": "SELECT $__timeGroup(first_seen, 1h) AS time, metric_type, COUNT(*) AS new_series\nFROM $schema.metric_series\nWHERE $__timeFilter(first_seen)\n  AND $__labelMatch(labels, 'service.name', ${service:json})\nGROUP BY $__timeGroup(first_seen, 1h), metric_type\nORDER BY time"
+        }
+      ]
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "opentelemetry",
+    "kinetica",
+    "metrics"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Kinetica",
+        "multi": false,
+        "name": "DS_KINETICA",
+        "options": [],
+        "query": "kinetica-grafana-datasource",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "name": "schema",
+        "label": "Schema",
+        "type": "textbox",
+        "query": "otel",
+        "hide": 0,
+        "current": {
+          "text": "otel",
+          "value": "otel"
+        },
+        "options": [
+          {
+            "selected": true,
+            "text": "otel",
+            "value": "otel"
+          }
+        ],
+        "description": "The schema the Kinetica exporter writes its metric tables to"
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "description": "The services with metrics",
+        "datasource": {
+          "type": "kinetica-grafana-datasource",
+          "uid": "${DS_KINETICA}"
+        },
+        "query": {
+          "refId": "service-values",
+          "rawSql": "SELECT DISTINCT service_name FROM $schema.metric_series WHERE service_name IS NOT NULL ORDER BY service_name"
+        },
+        "definition": "SELECT DISTINCT service_name FROM $schema.metric_series WHERE service_name IS NOT NULL ORDER BY service_name",
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": [],
+        "refresh": 1,
+        "sort": 1,
+        "regex": "",
+        "hide": 0
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "OTel metrics on Kinetica / Inventory",
+  "uid": "kinetica-otel-inventory",
+  "version": 1,
+  "weekStart": ""
+}
